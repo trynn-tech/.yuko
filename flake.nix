@@ -10,12 +10,12 @@
     };
 
     nixCats = {
-      url = "github:BirdeeHub/nixCats-nvim";
+      url = "github:BirdeeHub/nixCats-nvim?dir=templates/example";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, nixCats, ... }:
+      outputs = { self, nixpkgs, home-manager, nixCats, ... }:
   let
     system = "x86_64-linux";  # adjust if needed
     pkgs   = import nixpkgs { inherit system; };
