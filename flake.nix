@@ -26,7 +26,7 @@
 
         modules = [
           ./profiles/yuko-core.nix
-          nixvim.homeManagerModules.nixvim
+          nixvim.homeModules.nixvim
         ];
       };
   };

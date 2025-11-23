@@ -4,8 +4,11 @@
 {
   imports = [
     ../modules/core.nix
-    ../modules/shell.nix
+    ../modules/shell/default.nix
   ];
+
+  # Turn on the “default shell” behavior for this profile/mode
+  yuko.shell.default = true;
 
   programs.nixvim = {
     enable = true;
@@ -23,6 +26,7 @@
       treesitter.enable = true;
       lsp.enable        = true;
       telescope.enable  = true;
+      web-devicons.enable = true;
       which-key.enable  = true;
     };
 
