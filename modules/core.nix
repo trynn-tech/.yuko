@@ -1,21 +1,22 @@
+# modules/core.nix 
 { config, pkgs, ... }:
-
 {
   home.username      = "trynn";
   home.homeDirectory = "/home/trynn";
 
-  # this is the important line:
+  # Must be a supported version for your pinned home-manager
   home.stateVersion  = "23.11";
 
-  home.sessionVariables = {
-    LANG = "en_US.UTF-8";
-    EDITOR = "nvim";  # will point to nixCats in core profile
-  };
+  programs.home-manager.enable = true;
 
-  # common packages for all modes (you can tune this)
+  # Some global packages you always want
   home.packages = with pkgs; [
-    hello
+    git
+    ripgrep
+    fd
+    fzf
   ];
 
-  programs.home-manager.enable = true;
+  # Editor env var – will point to nixvim's nvim
+  home.sessionVariables.EDITOR = "nvim";
 }

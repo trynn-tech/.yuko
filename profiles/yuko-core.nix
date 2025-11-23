@@ -1,25 +1,36 @@
 # profiles/yuko-core.nix
-{ config, pkgs, nixCats, ... }:
+{ config, pkgs, ... }:
 
 {
   imports = [
-    ../modules/core.nix   # your core module (username, stateVersion, etc)
-    nixCats.homeModule    # import nixCats' HM module
+    ../modules/core.nix
+    ../modules/shell.nix
   ];
 
-  # nixCats module configuration
-  nixCats = {
+  programs.nixvim = {
     enable = true;
 
-    # this is the name of the wrapped Neovim package it will create
-    # it will give you a binary named "nvim" on your PATH
-    packageNames = [ "nvim" ];
+    # Basic options
+    globals.mapleader = " ";
+    opts = {
+      number         = true;
+      relativenumber = true;
+      termguicolors  = true;
+    };
 
-    # where your Lua config lives
-    # you can change this later once you have your nixCats config directory sorted
-    luaPath = ./.;
+    # A tiny starter plugin set – you can expand later
+    plugins = {
+      treesitter.enable = true;
+      lsp.enable        = true;
+      telescope.enable  = true;
+      which-key.enable  = true;
+    };
+
+    # Your own Lua on top (you can move this to a file later)
+    extraConfigLua = ''
+      -- YukoNix Scaffold: starter config
+      vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<CR>")
+      vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<CR>")
+    '';
   };
-
-  # point $EDITOR at the nixCats-provided nvim
-  home.sessionVariables.EDITOR = "nvim";
 }

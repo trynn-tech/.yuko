@@ -1,51 +1,33 @@
 {
-  description = "Yuko HM profiles (modes) with shared modules + nixCats";
+  description = "YukoNix Scaffold – Home Manager + nixvim profiles";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    nixCats = {
-      url = "github:BirdeeHub/nixCats-nvim?dir=templates/example";
+    nixvim = {
+      url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-      outputs = { self, nixpkgs, home-manager, nixCats, ... }:
+  outputs = { self, nixpkgs, home-manager, nixvim, ... }:
   let
-    system = "x86_64-linux";  # adjust if needed
+    system = "x86_64-linux";
     pkgs   = import nixpkgs { inherit system; };
   in {
-    # Profile 1: main mode
     homeConfigurations."yuko-core" =
       home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
         modules = [
           ./profiles/yuko-core.nix
+          nixvim.homeManagerModules.nixvim
         ];
-
-        extraSpecialArgs = {
-          inherit nixCats;
-        };
-      };
-
-    # Profile 2: minimal mode (example alt)
-    homeConfigurations."yuko-minimal" =
-      home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-
-        modules = [
-          ./profiles/yuko-minimal.nix
-        ];
-
-        extraSpecialArgs = {
-          inherit nixCats;
-        };
       };
   };
 }
