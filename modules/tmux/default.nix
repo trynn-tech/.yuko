@@ -4,30 +4,28 @@
   programs.tmux = {
     enable = true;
 
-    # Good defaults
+    # Use Nix zsh as tmux's shell (note: string, not derivation)
+    shell = "${pkgs.zsh}/bin/zsh";
+
     terminal = "screen-256color";
     mouse = true;
     keyMode = "vi";
     historyLimit = 100000;
     clock24 = true;
 
-    # Make sure tmux uses zsh explicitly, even if something upstream is weird
     extraConfig = ''
-      # Use zsh as the default shell inside tmux
-      set-option -g default-shell /usr/bin/zsh
-
-      # Start window & pane numbering at 1 (more human-friendly)
+      # Start window & pane indexing at 1
       set-option -g base-index 1
       set-window-option -g pane-base-index 1
 
-      # Easier split shortcuts (Prefix + |, Prefix + -)
+      # Split shortcuts
       bind | split-window -h
       bind - split-window -v
 
-      # Reload tmux config: Prefix + r
+      # Reload config
       bind r source-file ~/.tmux.conf \; display-message "tmux config reloaded"
 
-      # Make copy-mode feel more vimmy
+      # Vim-style copy mode
       setw -g mode-keys vi
     '';
   };
