@@ -5,6 +5,7 @@
   imports = [
     ../modules/core.nix
     ../modules/shell/default.nix
+    ../modules/tmux/default.nix
   ];
 
   # Turn on the “default shell” behavior for this profile/mode
