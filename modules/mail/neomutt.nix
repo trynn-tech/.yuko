@@ -2,85 +2,45 @@
 { config, lib, pkgs, ... }:
 
 let
-  inherit (lib) mkIf;
-
-  # Dynamic resolution from core.nix
+  active      = config.yuko.mail.activeAccount;
   hmAccount   = config.yuko.mail.activeHmAccount;
   yukoAccount = config.yuko.mail.activeAccountMeta;
 
-  maildirBase = yukoAccount.maildirBasePath;
+  maildir     = yukoAccount.maildirBasePath;
 in
 {
-  programs.neomutt = {
-    enable = true;
+  programs.neomutt.enable = true;
 
-    settings = {
-      # Core folders (Maildir)
-      folder      = maildirBase;       # e.g. /home/trynn/Mail/trynn-primary
-      spoolfile   = "+INBOX";
-      mbox        = maildirBase;       # “mbox” also points at the same Maildir root
-      record      = "+Sent";
-      postponed   = "+Drafts";
-      trash       = "+Trash";
+  xdg.configFile."neomutt/neomuttrc".text = ''
+    # ---- NeoMutt Config (YukoNix) ----
 
-      # Identity (could also pull from hmAccount, but you already know the address)
-      realname    = ''"Tristen Young"'';
-      from        = hmAccount.address or "tristen@trynn.tech";
+    # Maildir root for all folders
+    set folder = "${maildir}"
 
-      # Send via msmtp account we set up
-      sendmail    = ''"msmtp -a trynn-primary"'';
+    # INBOX path
+    set spoolfile = "${maildir}/Inbox"
 
-      # UX
-      editor      = "nvim";
-      sort        = "threads";
-      sort_aux    = "reverse-last-date-received";
-      mark_old    = "no";
-      date_format = ''"%Y-%m-%d %H:%M"'';
-      timeout     = "5";
-      check_new   = "yes";
+    # Where read mail gets stored (we keep it Inbox-neutral)
+    set mbox = "${maildir}/Inbox"
 
-      # Caches
-      header_cache    = "~/.cache/neomutt/headers";
-      message_cachedir = "~/.cache/neomutt/messages";
-    };
+    # Identity
+    set realname = "${hmAccount.realName}"
+    set from = "${hmAccount.address}"
 
-    sidebar = {
-      enable    = true;
-      shortPath = true;
-      format    = "%D%?F? [%F]?%* %?N?%N/?%S";
-      width     = 30;
-    };
+    # Sorting
+    set sort = "threads"
+    set sort_aux = "reverse-last-date-received"
 
-    binds = [
-      { map = [ "index" ]; key = "q";           action = "quit"; }
-      { map = [ "index" ]; key = "<space>";     action = "next-page"; }
-      { map = [ "index" ]; key = "<backspace>"; action = "previous-page"; }
-      { map = [ "index" ]; key = "m";           action = "mail"; }
-    ];
+    # UI
+    set editor = "nvim"
+    set mark_old = "no"
+    set check_new = "yes"
 
-    # You can uncomment later for raw extra neomutt rc snippets:
-    # extraConfig = ''
-    #   # Adjunct Code here ...
-    # '';
-  };
+    # Caches
+    set header_cache = "~/.cache/neomutt/headers"
+    set message_cachedir = "~/.cache/neomutt/messages"
+  '';
 
-  ########################################
-  ## Clean override of legacy configs
-  ########################################
-  home.activation.neomuttCleanLegacy =
-    mkIf config.programs.neomutt.enable
-      (lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-        # Delete old user mutt configs that might override Home Manager.
-        for f in ".muttrc" ".neomuttrc"; do
-          if [ -f "$HOME/$f" ]; then
-            echo "YukoNix: removing legacy mutt config $HOME/$f (Home Manager now owns neomutt)."
-            rm -f "$HOME/$f"
-          fi
-        done
-
-        if [ -d "$HOME/.config/mutt" ]; then
-          echo "YukoNix: removing legacy ~/.config/mutt directory."
-          rm -rf "$HOME/.config/mutt"
-        fi
-      '');
+  # Optional: add your own binds here if you want:
+  # xdg.configFile."neomutt/bindings".text = ''
 }
