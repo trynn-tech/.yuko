@@ -11,6 +11,9 @@
     ../modules/shell/default.nix
     ../modules/tmux/default.nix
 
+    # Composer
+    ../modules/composer
+
     # Mail modules 
     ../modules/mail/accounts/trynn-primary.nix
     ../modules/mail/neomutt.nix
@@ -57,5 +60,18 @@
 
   # Allow mail or mbsync/IMAP to create directories
   yuko.security.mailLockdown = false;
+
+  yuko.composer.ctags.enable = true;
+
+  # -------------------------------
+  # Custom Semantic Compiler
+  # -------------------------------
+  yuko.composer.ctags.extraConfig = ''
+    # Treat *.nix as Nix (if needed)
+    --langmap=Nix:.nix
+
+    # Later: USL / Forge / yuko.* patterns here
+    # Adjunct definition of code here ...
+  '';
 
 }
