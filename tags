@@ -22,7 +22,7 @@ component	modules/shell/default.nix	/^                component = "shell";$/;"	m
 component	modules/shell/default.nix	/^                component = "shell";$/;"	m
 component	modules/shell/default.nix	/^                component = "shell";$/;"	m
 config	modules/composer/ctags.nix	/^  config = lib.mkIf config.yuko.composer.ctags.enable {$/;"	m
-config	modules/composer/yk.nix	/^  config = mkIf config.yuko.composer.yk.enable {$/;"	m
+config	modules/composer/sculpt.nix	/^  config = lib.mkIf cfg.enable {$/;"	m
 config	modules/core.nix	/^  config =$/;"	m
 config	modules/shell/default.nix	/^  config =$/;"	m
 configContent	modules/mail/msmtp.nix	/^    configContent = ''$/;"	m
@@ -31,7 +31,6 @@ ctags	modules/composer/ctags.nix	/^  options.yuko.composer.ctags = {$/;"	m
 debug	modules/core.nix	/^    yuko.debug = {$/;"	m
 default	modules/composer/ctags.nix	/^      default = "";$/;"	m
 default	modules/composer/ctags.nix	/^      default = true;$/;"	m
-default	modules/composer/yk.nix	/^    default = true;$/;"	m
 default	modules/core.nix	/^        default = ".yuko\/logs\/core-debug.log";$/;"	m
 default	modules/core.nix	/^        default = "trynn-primary";$/;"	m
 default	modules/core.nix	/^        default = true;$/;"	m
@@ -42,7 +41,6 @@ default	modules/shell/default.nix	/^  options.yuko.shell.default = lib.mkOption 
 description	flake.nix	/^  description = "YukoNix Scaffold – Home Manager + nixvim profiles";$/;"	m
 description	modules/composer/ctags.nix	/^      description = "Enable nix-doc + ctags tagging for the .yuko tree.";$/;"	m
 description	modules/composer/ctags.nix	/^      description = ''$/;"	m
-description	modules/composer/yk.nix	/^    description = "Install the yk shell connectome helper in ~\/.local\/bin.";$/;"	m
 description	modules/core.nix	/^              description = "Base Maildir path for this account.";$/;"	m
 description	modules/core.nix	/^              description = "pass entry used for IMAP auth.";$/;"	m
 description	modules/core.nix	/^              description = "pass entry used for SMTP auth.";$/;"	m
@@ -55,14 +53,9 @@ description	modules/core.nix	/^        description = "Resolved Yuko mail metadat
 description	modules/core.nix	/^        description = "Whether to write manual-step hints into a log file.";$/;"	m
 description	modules/core.nix	/^      description = ''$/;"	m
 description	modules/shell/default.nix	/^    description = ''$/;"	m
-do	modules/composer/yk.nix	/^          while IFS='' read -r line; do$/;"	m
 drafts	modules/mail/accounts/trynn-primary.nix	/^      drafts = "Drafts";$/;"	m
-echo	modules/composer/yk.nix	/^            if [ "\$in_block" -eq 0 ] && [ "\$line" = "\$start_line" ]; then$/;"	m
-echo	modules/composer/yk.nix	/^            if [ "\$in_block" -eq 0 ]; then$/;"	m
-echo	modules/composer/yk.nix	/^            if [ "\$in_block" -eq 1 ] && [ "\$line" = "\$end_line" ]; then$/;"	m
-echo	modules/composer/yk.nix	/^          if [ -z "\$file" ]; then$/;"	m
 enable	modules/composer/ctags.nix	/^    enable = mkOption {$/;"	m
-enable	modules/composer/yk.nix	/^  options.yuko.composer.yk.enable = mkOption {$/;"	m
+enable	modules/composer/sculpt.nix	/^    enable = lib.mkEnableOption "yk — the Yuko connectome sculpting tool";$/;"	m
 enable	modules/core.nix	/^      programs.home-manager.enable = true;$/;"	m
 enable	modules/editors/nixvim.nix	/^      lsp.enable          = true;$/;"	m
 enable	modules/editors/nixvim.nix	/^      telescope.enable    = true;$/;"	m
@@ -82,11 +75,11 @@ enable	profiles/yuko-core.nix	/^  programs.home-manager.enable = true;$/;"	m
 enable	profiles/yuko-core.nix	/^  yuko.composer.ctags.enable = true;$/;"	m
 enableCompletion	modules/shell/default.nix	/^        enableCompletion = true;$/;"	m
 entryAfter	modules/composer/ctags.nix	/^  inherit (lib.hm.dag) entryAfter;$/;"	m
+executable	modules/composer/sculpt.nix	/^    home.file.".local\/bin\/yk".executable = true;$/;"	m
 extraConfig	modules/composer/ctags.nix	/^    extraConfig = mkOption {$/;"	m
 extraConfig	modules/tmux/default.nix	/^    extraConfig = ''$/;"	m
 extraConfig	profiles/yuko-core.nix	/^  yuko.composer.ctags.extraConfig = ''$/;"	m
 extraConfigLua	modules/editors/nixvim.nix	/^    extraConfigLua = ''$/;"	m
-f	modules/composer/yk.nix	/^          if [ -n "\$target" ]; then$/;"	m
 folders	modules/mail/accounts/trynn-primary.nix	/^    folders = {$/;"	m
 follows	flake.nix	/^      inputs.nixpkgs.follows = "nixpkgs";$/;"	m
 follows	flake.nix	/^      inputs.nixpkgs.follows = "nixpkgs";$/;"	m
@@ -124,9 +117,7 @@ message	modules/shell/default.nix	/^                message   = "Install 'chsh' 
 message	modules/shell/default.nix	/^                message   = "Install zsh (e.g. 'sudo apt install zsh') so YukoNix can set it as login shell.";$/;"	m
 message	modules/shell/default.nix	/^                message   = "Login shell change failed. Try 'chsh -s \/usr\/bin\/zsh' manually if desired.";$/;"	m
 message	modules/shell/default.nix	/^                message   = "Login shell changed to \/usr\/bin\/zsh. Open a new terminal\/tmux session to use it.";$/;"	m
-mkIf	modules/composer/yk.nix	/^  inherit (lib) mkIf mkOption types;$/;"	m
 mkOption	modules/composer/ctags.nix	/^  inherit (lib) mkOption types;$/;"	m
-mkOption	modules/composer/yk.nix	/^  inherit (lib) mkIf mkOption types;$/;"	m
 mkOption	modules/core.nix	/^  inherit (lib) mkOption types;$/;"	m
 modules	flake.nix	/^        modules = [$/;"	m
 mouse	modules/tmux/default.nix	/^    mouse = true;$/;"	m
@@ -152,20 +143,21 @@ readOnly	modules/core.nix	/^        readOnly = true;$/;"	m
 readOnly	modules/core.nix	/^        readOnly = true;$/;"	m
 realName	modules/mail/accounts/trynn-primary.nix	/^    realName = "Tristen Young";$/;"	m
 relativenumber	modules/editors/nixvim.nix	/^      relativenumber = true;$/;"	m
+sculpt	modules/composer/sculpt.nix	/^  options.yuko.composer.sculpt = {$/;"	m
 sent	modules/mail/accounts/trynn-primary.nix	/^      sent   = "Sent";$/;"	m
-sessionPath	modules/composer/yk.nix	/^    home.sessionPath = (config.home.sessionPath or []) ++ [ "\${config.home.homeDirectory}\/.local\/bin" ];$/;"	m
+sessionPath	modules/composer/sculpt.nix	/^    home.sessionPath = [ "\${config.home.homeDirectory}\/.local\/bin" ];$/;"	m
 setDefaultShell	modules/shell/default.nix	/^      home.activation.setDefaultShell =$/;"	m
 shell	modules/tmux/default.nix	/^    shell = "\${pkgs.zsh}\/bin\/zsh";$/;"	m
 smtp	modules/mail/accounts/trynn-primary.nix	/^    smtp = {$/;"	m
 smtpPassEntry	modules/core.nix	/^            smtpPassEntry = mkOption {$/;"	m
 smtpPassEntry	modules/mail/accounts/trynn-primary.nix	/^    smtpPassEntry   = "mail\/trynn-tech-primary";$/;"	m
+source	modules/composer/sculpt.nix	/^    home.file.".local\/bin\/yk".source = pkgs.writeScript "yk" ''$/;"	m
 stateVersion	modules/core.nix	/^      home.stateVersion  = "23.11";$/;"	m
 stateVersion	profiles/yuko-core.nix	/^  home.stateVersion  = "23.11";$/;"	m
 system	flake.nix	/^    pkgs   = import nixpkgs { inherit system; };$/;"	m
 termguicolors	modules/editors/nixvim.nix	/^      termguicolors  = true;$/;"	m
 terminal	modules/tmux/default.nix	/^    terminal = "screen-256color";$/;"	m
 text	modules/composer/ctags.nix	/^    home.file.".yuko\/.ctags".text = ''$/;"	m
-text	modules/composer/yk.nix	/^      text = ''$/;"	m
 text	modules/mail/mbsync.nix	/^  xdg.configFile."isyncrc".text = ''$/;"	m
 text	modules/mail/neomutt.nix	/^  xdg.configFile."neomutt\/neomuttrc".text = ''$/;"	m
 tls	modules/mail/accounts/trynn-primary.nix	/^      tls = {$/;"	m
@@ -174,7 +166,6 @@ tmux	modules/tmux/default.nix	/^  programs.tmux = {$/;"	m
 trash	modules/mail/accounts/trynn-primary.nix	/^      trash  = "Trash";$/;"	m
 type	modules/composer/ctags.nix	/^      type = types.bool;$/;"	m
 type	modules/composer/ctags.nix	/^      type = types.lines;$/;"	m
-type	modules/composer/yk.nix	/^    type = types.bool;$/;"	m
 type	modules/core.nix	/^              type = types.str;$/;"	m
 type	modules/core.nix	/^              type = types.str;$/;"	m
 type	modules/core.nix	/^              type = types.str;$/;"	m
@@ -188,7 +179,6 @@ type	modules/core.nix	/^        type = types.str;$/;"	m
 type	modules/core.nix	/^      type = types.bool;$/;"	m
 type	modules/shell/default.nix	/^    type = lib.types.bool;$/;"	m
 types	modules/composer/ctags.nix	/^  inherit (lib) mkOption types;$/;"	m
-types	modules/composer/yk.nix	/^  inherit (lib) mkIf mkOption types;$/;"	m
 types	modules/core.nix	/^  inherit (lib) mkOption types;$/;"	m
 url	flake.nix	/^      url = "github:nix-community\/home-manager";$/;"	m
 url	flake.nix	/^      url = "github:nix-community\/nixvim";$/;"	m

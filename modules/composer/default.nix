@@ -3,7 +3,8 @@
 {
   imports = [
     ./ctags.nix
-    #./yk.nix
+    #./sculpt.nix
+    ./cli.nix
     # later: ./lint.nix ./formatter.nix etc.
   ];
 }
