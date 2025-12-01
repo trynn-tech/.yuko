@@ -2,9 +2,9 @@
 { ... }:
 {
   imports = [
-    ./ctags.nix
-    #./sculpt.nix
     ./cli.nix
+    ./local-bin.nix
+    ./ctags.nix
     # later: ./lint.nix ./formatter.nix etc.
   ];
 }

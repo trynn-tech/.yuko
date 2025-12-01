@@ -55,6 +55,8 @@
   # Toggle global FLAGs
   # -------------------------------
 
+  yuko.composer.cli.enable = true;
+
   # debug helper
   yuko.debug.manualSteps = true;
 

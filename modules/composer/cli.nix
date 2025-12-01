@@ -3,10 +3,10 @@
 
 with lib;
 let
-  cfg = config.yuko.cli;
+  cfg = config.yuko.composer.cli;
 in
 {
-  options.yuko.cli = {
+  options.yuko.composer.cli = {
     enable = mkEnableOption "Yuko CLI tools (yk connectome sculptor)";
   };
 
