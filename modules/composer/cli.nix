@@ -1,141 +1,278 @@
-# modules/cli.nix
+# modules/composer/cli.nix
 { config, lib, pkgs, ... }:
 
-with lib;
 let
-  cfg = config.yuko.composer.cli;
-in
-{
+  inherit (lib) mkOption types mkIf;
+
+  homeDir   = config.home.homeDirectory;
+  yukoRoot  = "${homeDir}/.yuko";
+  tagsFile  = "${yukoRoot}/.tags/tags";
+
+  # Choose an editor for yk to use
+  editorBin = config.home.sessionVariables.EDITOR or "nvim";
+
+  ykBin = pkgs.writeShellScriptBin "yk" ''
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    YK_ROOT="${yukoRoot}"
+    TAGS_FILE="${tagsFile}"
+    EDITOR_BIN="${editorBin}"
+
+    usage() {
+      cat <<EOF
+    yk – YukoNix repo helper
+
+    Usage:
+      yk help                Show this help
+      yk grep PATTERN        ripgrep in ${yukoRoot}
+      yk files               fzf over files and open in ${editorBin}
+      yk tag NAME            jump to first tag NAME using .tags/tags
+      yk board               show yuko:todo/doing/done kanban and jump
+
+    Conventions:
+      - Repo root: ${yukoRoot}
+      - Tags file: ${tagsFile}
+      - Inline kanban markers:
+          # yuko:todo  short description
+          # yuko:doing working on X
+          # yuko:done  finished Y
+    EOF
+    }
+
+    die() {
+      echo "yk: $*" >&2
+      exit 1
+    }
+
+    ensure_root() {
+      if [ ! -d "$YK_ROOT" ]; then
+        die "YK_ROOT '$YK_ROOT' does not exist"
+      fi
+    }
+
+    ensure_editor() {
+      if ! command -v "$EDITOR_BIN" >/dev/null 2>&1; then
+        die "EDITOR '$EDITOR_BIN' not found in PATH"
+      fi
+    }
+
+    cmd_grep() {
+      ensure_root
+      if ! command -v rg >/dev/null 2>&1; then
+        die "ripgrep (rg) not installed"
+      fi
+
+      if [ "$#" -lt 1 ]; then
+        die "yk grep PATTERN"
+      fi
+
+      local pattern="$1"
+      shift || true
+
+      ( cd "$YK_ROOT" && rg --no-heading --line-number --color=always "$pattern" . "$@" )
+    }
+
+    cmd_files() {
+      ensure_root
+      ensure_editor
+
+      if ! command -v fd >/dev/null 2>&1; then
+        die "fd not installed"
+      fi
+      if ! command -v fzf >/dev/null 2>&1; then
+        die "fzf not installed"
+      fi
+
+      local file
+      file="$(
+        cd "$YK_ROOT" &&
+        fd . . --type f | fzf --prompt="yk files> " --height=80%
+      )" || return 1
+
+      [ -z "$file" ] && return 0
+
+      "$EDITOR_BIN" "$YK_ROOT/$file"
+    }
+
+    cmd_tag() {
+      ensure_root
+      ensure_editor
+
+      if [ ! -f "$TAGS_FILE" ]; then
+        die "tags file '$TAGS_FILE' not found (run your ctags generation)"
+      fi
+
+      if [ "$#" -lt 1 ]; then
+        die "yk tag NAME"
+      fi
+
+      local symbol="$1"
+      shift || true
+
+      # Basic ctags line: name<TAB>file<TAB>excmd...
+      local line
+      line="$(grep -m1 "^[''${symbol}	][^	]*	" "$TAGS_FILE" | grep -m1 "^''${symbol}	" || true)"
+
+      if [ -z "$line" ]; then
+        die "no tag found for '$symbol' in $TAGS_FILE"
+      fi
+
+      local file
+      file="$(printf '%s\n' "$line" | cut -f2)"
+
+      if [ -z "$file" ]; then
+        die "malformed tag line: $line"
+      fi
+
+      "$EDITOR_BIN" "$YK_ROOT/$file"
+    }
+
+    print_group() {
+      local title="$1"
+      shift || true
+      local items=("$@")
+
+      [ "''${#items[@]}" -eq 0 ] && return 0
+
+      echo
+      echo "== $title =="
+      local entry
+      for entry in "''${items[@]}"; do
+        # entry looks like: "N:path:line:rest of text"
+        local num path line text
+        num="''${entry%%:*}"
+        local rest="''${entry#*:}"
+        path="''${rest%%:*}"
+        rest="''${rest#*:}"
+        line="''${rest%%:*}"
+        text="''${rest#*:}"
+
+        printf "  [%s] %s:%s  %s\n" "$num" "$path" "$line" "$text"
+      done
+    }
+
+    cmd_board() {
+      ensure_root
+
+      if ! command -v rg >/dev/null 2>&1; then
+        die "ripgrep (rg) not installed"
+      fi
+
+      local raw
+      raw="$(cd "$YK_ROOT" && rg --no-heading --line-number "yuko:(todo|doing|done)" . || true)"
+
+      if [ -z "$raw" ]; then
+        echo "yk board: no yuko:todo/doing/done markers found in $YK_ROOT"
+        return 0
+      fi
+
+      local IFS=$'\n'
+      local idx=1
+      local todos=()
+      local doings=()
+      local dones=()
+
+      local line
+      for line in $raw; do
+        # Format: path:line:...yuko:state rest...
+        # Extract path, line, and status
+        local path lnum text status
+        path="''${line%%:*}"
+        local rest="''${line#*:}"
+        lnum="''${rest%%:*}"
+        text="''${rest#*:}"
+
+        status="$(printf '%s\n' "$text" | sed -E 's/.*yuko:(todo|doing|done).*/\1/')" || status=""
+
+        case "$status" in
+          todo)
+            todos+=("$idx:$path:$lnum:$text")
+            ;;
+          doing)
+            doings+=("$idx:$path:$lnum:$text")
+            ;;
+          done)
+            dones+=("$idx:$path:$lnum:$text")
+            ;;
+        esac
+
+        idx=$((idx + 1))
+      done
+
+      print_group "TODO"  "''${todos[@]}"
+      print_group "DOING" "''${doings[@]}"
+      print_group "DONE"  "''${dones[@]}"
+
+      echo
+      read -r -p "Jump to which item (number, empty to skip)? " choice || choice=""
+
+      [ -z "$choice" ] && return 0
+
+      local chosen=""
+      local item
+      for item in "''${todos[@]}" "''${doings[@]}" "''${dones[@]}"; do
+        if [[ "$item" == "$choice:"* ]]; then
+          chosen="$item"
+          break
+        fi
+      done
+
+      if [ -z "$chosen" ]; then
+        die "no board item with id '$choice'"
+      fi
+
+      local cnum cpath crest clnum
+      cnum="''${chosen%%:*}"
+      crest="''${chosen#*:}"
+      cpath="''${crest%%:*}"
+      crest="''${crest#*:}"
+      clnum="''${crest%%:*}"
+
+      ensure_editor
+      "$EDITOR_BIN" "+''${clnum}" "$YK_ROOT/$cpath"
+    }
+
+    main() {
+      local cmd="''${1:-help}"
+      shift || true
+
+      case "$cmd" in
+        help|-h|--help)
+          usage
+          ;;
+        grep)
+          cmd_grep "$@"
+          ;;
+        files|file)
+          cmd_files
+          ;;
+        tag)
+          cmd_tag "$@"
+          ;;
+        board)
+          cmd_board
+          ;;
+        *)
+          echo "yk: unknown command '$cmd'" >&2
+          usage
+          exit 1
+          ;;
+      esac
+    }
+
+    main "$@"
+  '';
+in {
   options.yuko.composer.cli = {
-    enable = mkEnableOption "Yuko CLI tools (yk connectome sculptor)";
+    enable = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Enable the yk CLI helper for navigating ~/.yuko.";
+    };
   };
 
-  config = mkIf cfg.enable {
-    # Install yk as a proper Home Manager package (goes to ~/.local/bin/yk)
-    home.packages = [
-      pkgs.fzf
-      (pkgs.writeShellScriptBin "yk" ''
-        #!/usr/bin/env zsh
-        # ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-        # ┃ yk — Yuko Connectome Sculptor (v0.3)                   ┃
-        # ┃ Precision grepping + future AI sidecar entrypoint      ┃
-        # ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-
-        setopt err_exit no_unset pipe_fail
-
-        typeset -r YK_ROOT="''${YK_ROOT:-$HOME/.yuko}"
-        typeset -r TAG_START=">>> YUKO:"
-        typeset -r TAG_END="<<< YUKO:"
-
-        (( ''${+commands[fzf]} )) || { print -u2 "yk: fzf not found in PATH"; exit 1 }
-
-        usage() { cat <<'EOF'
-        yk — surgical edits in ~/.yuko via semantic blocks
-
-        Commands:
-          find <pat>        → grep block starts matching <pat>
-          file <tag>        → file containing exact <tag>
-          show <tag>        → cat block contents (including markers)
-          edit <tag>        → edit block body in $EDITOR, markers preserved
-          replace <tag>     → replace block body from stdin
-          ls                → fzf-powered tag browser (all files)
-          ls <file>         → fzf browser scoped to one file
-          ai <tag>          → (future) ask intelligence to rewrite block
-        EOF
-        }
-
-        yk_find() {
-          grep -R --color=never -n "$TAG_START$1" "$YK_ROOT" 2>/dev/null | sed "s|^$YK_ROOT/||"
-        }
-
-        yk_file() {
-          grep -Rl "$TAG_START$1" "$YK_ROOT" 2>/dev/null | head -n1
-        }
-
-        yk_show() {
-          local file=$(yk_file "$1") || return 1
-          sed -n "/^$TAG_START$1"'$/,/^$TAG_END$1'''$/p' "$YK_ROOT/$file"
-        }
-
-        yk_edit() {
-          local tag="$1" file=$(yk_file "$tag") || return 1
-          local tmp=\( (mktemp) clean= \)(mktemp)
-
-          yk_show "$tag" > "$tmp"
-          ''${EDITOR:-nvim} "$tmp"
-
-          sed '1d;$d' "$tmp" > "$clean"   # strip markers
-          yk_replace "$tag" < "$clean"
-          rm -f "$tmp" "$clean"
-          print "Sculpted block '$tag' in $file"
-        }
-
-        yk_replace() {
-          local tag="$1" file=$(yk_file "$tag") || return 1
-          local tmp=\( (mktemp) input= \)(cat)
-
-          local in_block=0
-          while IFS= read -r line; do
-            if [[ "$line" == "$TAG_START$tag" ]]; then
-              in_block=1
-              print "$line"
-              print "$input"
-              continue
-            elif [[ "$line" == "$TAG_END$tag" ]]; then
-              in_block=0
-              print "$line"
-              continue
-            fi
-            (( in_block )) || print "$line"
-          done < "$YK_ROOT/$file" > "$tmp"
-          mv "$tmp" "$YK_ROOT/$file"
-        }
-
-        yk_ls() {
-          local target="''${1:-$YK_ROOT}"
-          local chosen
-          if [[ -f "$target" ]]; then
-            chosen=$(grep -n "$TAG_START" "$target" | \
-              fzf --with-nth=2.. --preview='echo {} | cut -d: -f2- | sed "s|^.*YUKO:|"YUKO:|" | xargs -I% yk show %')
-          else
-            chosen=$(grep -Rn "$TAG_START" "$YK_ROOT" | sed "s|^$YK_ROOT/||" | \
-              fzf --with-nth=2.. --preview='echo {} | cut -d: -f2- | sed "s|^.*YUKO:|"YUKO:|" | xargs -I% yk show %')
-          fi
-          [[ -n "\( chosen" ]] && yk edit \)(echo "$chosen" | awk -F: '{print $3}' | sed "s/$TAG_START//")
-        }
-
-        case "$1" in
-          find)     shift; yk_find "$@" ;;
-          file)     shift; yk_file "$@" ;;
-          show)     shift; yk_show "$@" ;;
-          edit)     shift; yk_edit "$@" ;;
-          replace)  shift; yk_replace "$@" ;;
-          ls|"")    yk_ls "$2" ;;
-          ai)       shift; print "Intelligence sidecar not yet summoned… (tag: $1)"; exit 1 ;;
-          -h|--help|help) usage ;;
-          *) print "Unknown command: $1"; usage; exit 1 ;;
-        esac
-      '')
-    ];
-
-
-    # Prepend ~/.local/bin to PATH for instant access
-    home.sessionVariables.PATH = "$HOME/.local/bin:$PATH";
-
-    # Seed a welcome block in ~/.yuko on first activation
-    home.activation.seedYukoConnectome = hm.dag.entryAfter ["writeBoundary"] ''
-      mkdir -p "$HOME/.yuko"
-      if [[ ! -f "$HOME/.yuko/welcome.yk" ]]; then
-        cat > "$HOME/.yuko/welcome.yk" <<'EOF'
->>> YUKO: yk-welcome
-yk is alive! Your connectome sculptor is ready.
-- Sculpt new blocks: yk edit my-first-tag
-- Browse: yk ls
-- Future: yk ai brainstorm-flake-ideas
-<<< YUKO: yk-welcome
-        EOF
-        echo "Seeded ~/.yuko/welcome.yk — run 'yk ls' to explore!"
-      fi
-    '';
+  config = mkIf config.yuko.composer.cli.enable {
+    home.packages = [ ykBin ];
   };
 }
