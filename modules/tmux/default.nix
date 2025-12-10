@@ -29,4 +29,6 @@
       setw -g mode-keys vi
     '';
   };
+
+  xdg.configFile."tmux/tmux.conf".force = true;
 }
