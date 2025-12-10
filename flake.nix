@@ -1,6 +1,9 @@
 {
-  description = "YukoNix Scaffold – Home Manager + nixvim profiles";
 
+  description = "YukoNix Scaffold – Home Manager + nixvim profiles";
+  #========
+  # Inputs
+  #========
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -15,19 +18,38 @@
     };
   };
 
+  #========
+  # Outputs
+  #========
   outputs = { self, nixpkgs, home-manager, nixvim, ... }:
   let
     system = "x86_64-linux";
-    pkgs   = import nixpkgs { inherit system; };
-  in {
-    homeConfigurations."yuko-core" =
+
+    pkgs = import nixpkgs { inherit system; };
+
+    yukoEnv =
+      if builtins.pathExists ./.yuko-env.nix
+      then import ./.yuko-env.nix
+      else import ./.yuko-env.example.nix;
+
+  
+    mkYuko = { userName, homeDir }:
       home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
         modules = [
           ./profiles/yuko-core.nix
           nixvim.homeModules.nixvim
+          {
+            home.username      = yukoEnv.userName;
+            home.homeDirectory = yukoEnv.homeDir;
+            home.stateVersion  = "23.11";
+          }
         ];
       };
+  in {
+    homeConfigurations = {
+      yuko-core = mkYuko yukoEnv;
+    };
   };
 }

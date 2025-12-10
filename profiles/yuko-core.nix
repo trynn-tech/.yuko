@@ -2,6 +2,7 @@
 { config, lib, pkgs, ... }:
 
 {
+
   imports = [
     # Core
     ../modules/core.nix
@@ -21,14 +22,9 @@
     ../modules/mail/msmtp.nix
   ];
 
-  # -------------------------------
-  # Home Manager identity
-  # -------------------------------
-  home.username      = "trynn";
-  home.homeDirectory = "/home/trynn";
 
-  # Must match the version your pinned Home Manager supports
-  home.stateVersion  = "23.11";
+  # Profile-specific extras live here if needed
+  # e.g. extra home.packages, host-specific stuff, etc.
 
   # Enable HM managing itself
   programs.home-manager.enable = true;

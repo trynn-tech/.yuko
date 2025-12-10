@@ -5,6 +5,7 @@ let
   inherit (lib) mkOption types;
 in
 {
+
   ########################################
   ## OPTIONS
   ########################################
@@ -107,14 +108,15 @@ in
 
       hmActive   = attrByPath [ active ] null hmAccounts;
       yukoActive = attrByPath [ active ] null yukoAccounts;
+
     in
     {
       ########################################
       ## Core Home Manager basics
       ########################################
-      home.username      = "trynn";
-      home.homeDirectory = "/home/trynn";
-      home.stateVersion  = "23.11";
+      #home.username      = config.home.username;
+      #home.homeDirectory = config.home.homeDirectory;
+      #home.stateVersion  = config.home.stateVersion;
 
       programs.home-manager.enable = true;
 

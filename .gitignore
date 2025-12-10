@@ -1,0 +1,48 @@
+# -------------------------
+# Yuko per-host config
+# -------------------------
+.yuko-env.nix
+
+# Example stays tracked
+!.yuko-env.example.nix
+
+# -------------------------
+# Home Manager build artifacts
+# -------------------------
+result
+result-*
+home-manager-path
+home-manager-generation
+
+# -------------------------
+# YukoNix runtime stuff
+# -------------------------
+.logs
+logs/
+.yuko/logs/
+.yuko/core-debug.log
+
+# ctags / nix-doc tags
+.yuko/.tags/
+.tags/
+tags
+
+# -------------------------
+# Editor / tooling cruft
+# -------------------------
+*.swp
+*.swo
+*~
+.nvim.lua
+.idea/
+.vscode/
+.DS_Store
+
+# -------------------------
+# Python / misc (for future tools)
+# -------------------------
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/

@@ -4,14 +4,14 @@
 let
   inherit (lib) mkOption types mkIf;
 
-  homeDir   = config.home.homeDirectory;
-  yukoRoot  = "${homeDir}/.yuko";
-  tagsFile  = "${yukoRoot}/.tags/tags";
+  homeDir  = config.home.homeDirectory;
+  yukoRoot = "${homeDir}/.yuko";
+  tagsFile = "${yukoRoot}/.tags/tags";
 
-  # Choose an editor for yk to use
+  # Prefer HM's EDITOR, fallback to nvim
   editorBin = config.home.sessionVariables.EDITOR or "nvim";
 
-  ykBin = pkgs.writeShellScriptBin "yk" ''
+  ykScript = ''
     #!/usr/bin/env bash
     set -euo pipefail
 
@@ -21,23 +21,23 @@ let
 
     usage() {
       cat <<EOF
-    yk – YukoNix repo helper
+yk – YukoNix repo helper
 
-    Usage:
-      yk help                Show this help
-      yk grep PATTERN        ripgrep in ${yukoRoot}
-      yk files               fzf over files and open in ${editorBin}
-      yk tag NAME            jump to first tag NAME using .tags/tags
-      yk board               show yuko:todo/doing/done kanban and jump
+Usage:
+  yk help                Show this help
+  yk grep PATTERN        ripgrep in ${yukoRoot}
+  yk files               fzf over files and open in ${editorBin}
+  yk tag NAME            jump to first tag NAME using .tags/tags
+  yk board               show yuko:todo/doing/done kanban and jump
 
-    Conventions:
-      - Repo root: ${yukoRoot}
-      - Tags file: ${tagsFile}
-      - Inline kanban markers:
-          # yuko:todo  short description
-          # yuko:doing working on X
-          # yuko:done  finished Y
-    EOF
+Conventions:
+  - Repo root: ${yukoRoot}
+  - Tags file: ${tagsFile}
+  - Inline kanban markers:
+      # yuko:todo  short description
+      # yuko:doing working on X
+      # yuko:done  finished Y
+EOF
     }
 
     die() {
@@ -59,6 +59,7 @@ let
 
     cmd_grep() {
       ensure_root
+
       if ! command -v rg >/dev/null 2>&1; then
         die "ripgrep (rg) not installed"
       fi
@@ -70,7 +71,10 @@ let
       local pattern="$1"
       shift || true
 
-      ( cd "$YK_ROOT" && rg --no-heading --line-number --color=always "$pattern" . "$@" )
+      (
+        cd "$YK_ROOT"
+        rg --no-heading --line-number --color=always "$pattern" . "$@"
+      )
     }
 
     cmd_files() {
@@ -112,7 +116,7 @@ let
 
       # Basic ctags line: name<TAB>file<TAB>excmd...
       local line
-      line="$(grep -m1 "^[''${symbol}	][^	]*	" "$TAGS_FILE" | grep -m1 "^''${symbol}	" || true)"
+      line="$(grep -m1 "^''${symbol}\t" "$TAGS_FILE" || true)"
 
       if [ -z "$line" ]; then
         die "no tag found for '$symbol' in $TAGS_FILE"
@@ -131,7 +135,7 @@ let
     print_group() {
       local title="$1"
       shift || true
-      local items=("$@")
+      local items=("''${@}")
 
       [ "''${#items[@]}" -eq 0 ] && return 0
 
@@ -139,10 +143,10 @@ let
       echo "== $title =="
       local entry
       for entry in "''${items[@]}"; do
-        # entry looks like: "N:path:line:rest of text"
-        local num path line text
+        # entry: "N:path:line:rest of text"
+        local num path line text rest
         num="''${entry%%:*}"
-        local rest="''${entry#*:}"
+        rest="''${entry#*:}"
         path="''${rest%%:*}"
         rest="''${rest#*:}"
         line="''${rest%%:*}"
@@ -160,7 +164,10 @@ let
       fi
 
       local raw
-      raw="$(cd "$YK_ROOT" && rg --no-heading --line-number "yuko:(todo|doing|done)" . || true)"
+      raw="$(
+        cd "$YK_ROOT" &&
+        rg --no-heading --line-number "yuko:(todo|doing|done)" . || true
+      )"
 
       if [ -z "$raw" ]; then
         echo "yk board: no yuko:todo/doing/done markers found in $YK_ROOT"
@@ -175,26 +182,19 @@ let
 
       local line
       for line in $raw; do
-        # Format: path:line:...yuko:state rest...
-        # Extract path, line, and status
-        local path lnum text status
+        # path:line:...yuko:state...
+        local path rest lnum text status
         path="''${line%%:*}"
-        local rest="''${line#*:}"
+        rest="''${line#*:}"
         lnum="''${rest%%:*}"
         text="''${rest#*:}"
 
         status="$(printf '%s\n' "$text" | sed -E 's/.*yuko:(todo|doing|done).*/\1/')" || status=""
 
         case "$status" in
-          todo)
-            todos+=("$idx:$path:$lnum:$text")
-            ;;
-          doing)
-            doings+=("$idx:$path:$lnum:$text")
-            ;;
-          done)
-            dones+=("$idx:$path:$lnum:$text")
-            ;;
+          todo)  todos+=("$idx:$path:$lnum:$text") ;;
+          doing) doings+=("$idx:$path:$lnum:$text") ;;
+          done)  dones+=("$idx:$path:$lnum:$text") ;;
         esac
 
         idx=$((idx + 1))
@@ -263,6 +263,9 @@ let
 
     main "$@"
   '';
+
+  ykBin = pkgs.writeShellScriptBin "yk" ykScript;
+
 in {
   options.yuko.composer.cli = {
     enable = mkOption {
