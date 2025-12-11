@@ -2,8 +2,6 @@
 { ... }:
 {
   imports = [
-    ./cli.nix
-    ./local-bin.nix
-    ./ctags.nix
+    ./nix
   ];
 }

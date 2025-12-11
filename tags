@@ -26,6 +26,7 @@ config	modules/composer/cli.nix	/^  config = mkIf config.yuko.composer.cli.enabl
 config	modules/composer/ctags.nix	/^  config = lib.mkIf config.yuko.composer.ctags.enable {$/;"	m
 config	modules/composer/local-bin.nix	/^  config = mkIf config.yuko.composer.localBin.enable {$/;"	m
 config	modules/core.nix	/^  config =$/;"	m
+config	modules/dev/nix/default.nix	/^  config = mkIf config.yuko.dev.nix.enable {$/;"	m
 config	modules/shell/default.nix	/^  config =$/;"	m
 configContent	modules/mail/msmtp.nix	/^    configContent = ''$/;"	m
 createMaildir	modules/mail/mbsync.nix	/^  home.activation.createMaildir =$/;"	m
@@ -40,6 +41,7 @@ default	modules/core.nix	/^        default = "trynn-primary";$/;"	m
 default	modules/core.nix	/^        default = true;$/;"	m
 default	modules/core.nix	/^        default = {};$/;"	m
 default	modules/core.nix	/^      default = false;$/;"	m
+default	modules/dev/nix/default.nix	/^      default = true;$/;"	m
 default	modules/shell/default.nix	/^    default = false;$/;"	m
 default	modules/shell/default.nix	/^  options.yuko.shell.default = lib.mkOption {$/;"	m
 description	flake.nix	/^  description = "YukoNix Scaffold – Home Manager + nixvim profiles";$/;"	m
@@ -58,12 +60,14 @@ description	modules/core.nix	/^        description = "Resolved Home Manager emai
 description	modules/core.nix	/^        description = "Resolved Yuko mail metadata for the active account.";$/;"	m
 description	modules/core.nix	/^        description = "Whether to write manual-step hints into a log file.";$/;"	m
 description	modules/core.nix	/^      description = ''$/;"	m
+description	modules/dev/nix/default.nix	/^      description = "Enable Nix dev tooling (statix, deadnix, etc.) for YukoNix.";$/;"	m
 description	modules/shell/default.nix	/^    description = ''$/;"	m
 drafts	modules/mail/accounts/trynn-primary.nix	/^      drafts = "Drafts";$/;"	m
 enable	modules/composer/cli.nix	/^    enable = mkOption {$/;"	m
 enable	modules/composer/ctags.nix	/^    enable = mkOption {$/;"	m
 enable	modules/composer/local-bin.nix	/^  options.yuko.composer.localBin.enable = mkOption {$/;"	m
 enable	modules/core.nix	/^      programs.home-manager.enable = true;$/;"	m
+enable	modules/dev/nix/default.nix	/^    enable = mkOption {$/;"	m
 enable	modules/editors/nixvim.nix	/^      lsp.enable          = true;$/;"	m
 enable	modules/editors/nixvim.nix	/^      telescope.enable    = true;$/;"	m
 enable	modules/editors/nixvim.nix	/^      treesitter.enable   = true;$/;"	m
@@ -91,6 +95,7 @@ extraConfigLua	modules/editors/nixvim.nix	/^    extraConfigLua = ''$/;"	m
 folders	modules/mail/accounts/trynn-primary.nix	/^    folders = {$/;"	m
 follows	flake.nix	/^      inputs.nixpkgs.follows = "nixpkgs";$/;"	m
 follows	flake.nix	/^      inputs.nixpkgs.follows = "nixpkgs";$/;"	m
+force	modules/tmux/default.nix	/^  xdg.configFile."tmux\/tmux.conf".force = true;$/;"	m
 historyLimit	modules/tmux/default.nix	/^    historyLimit = 100000;$/;"	m
 home-manager	flake.nix	/^    home-manager = {$/;"	m
 homeConfigurations	flake.nix	/^    homeConfigurations = {$/;"	m
@@ -101,6 +106,7 @@ imap	modules/mail/accounts/trynn-primary.nix	/^    imap = {$/;"	m
 imapPassEntry	modules/core.nix	/^            imapPassEntry = mkOption {$/;"	m
 imapPassEntry	modules/mail/accounts/trynn-primary.nix	/^    imapPassEntry   = "mail\/trynn-tech-primary";$/;"	m
 imports	modules/composer/default.nix	/^  imports = [$/;"	m
+imports	modules/dev/default.nix	/^  imports = [$/;"	m
 imports	modules/mail/default.nix	/^  imports = [$/;"	m
 imports	profiles/yuko-core.nix	/^  imports = [$/;"	m
 inbox	modules/mail/accounts/trynn-primary.nix	/^      inbox  = "INBOX";$/;"	m
@@ -127,14 +133,17 @@ message	modules/shell/default.nix	/^                message   = "Login shell cha
 message	modules/shell/default.nix	/^                message   = "Login shell changed to \/usr\/bin\/zsh. Open a new terminal\/tmux session to use it.";$/;"	m
 mkIf	modules/composer/cli.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 mkIf	modules/composer/local-bin.nix	/^  inherit (lib) mkOption mkIf types;$/;"	m
+mkIf	modules/dev/nix/default.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 mkOption	modules/composer/cli.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 mkOption	modules/composer/ctags.nix	/^  inherit (lib) mkOption types;$/;"	m
 mkOption	modules/composer/local-bin.nix	/^  inherit (lib) mkOption mkIf types;$/;"	m
 mkOption	modules/core.nix	/^  inherit (lib) mkOption types;$/;"	m
+mkOption	modules/dev/nix/default.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 modules	flake.nix	/^        modules = [$/;"	m
 mouse	modules/tmux/default.nix	/^    mouse = true;$/;"	m
 msmtp	modules/mail/msmtp.nix	/^  programs.msmtp = {$/;"	m
 msmtpPreflight	modules/mail/msmtp.nix	/^  home.activation.msmtpPreflight =$/;"	m
+nix	modules/dev/nix/default.nix	/^  options.yuko.dev.nix = {$/;"	m
 nixvim	flake.nix	/^    nixvim = {$/;"	m
 nixvim	modules/editors/nixvim.nix	/^  programs.nixvim = {$/;"	m
 number	modules/editors/nixvim.nix	/^      number         = true;$/;"	m
@@ -144,6 +153,7 @@ opts	modules/editors/nixvim.nix	/^    opts = {$/;"	m
 outputs	flake.nix	/^  outputs = { self, nixpkgs, home-manager, nixvim, ... }:$/;"	f
 packages	modules/composer/cli.nix	/^    home.packages = [ ykBin ];$/;"	m
 packages	modules/composer/ctags.nix	/^    home.packages =$/;"	m
+packages	modules/dev/nix/default.nix	/^    home.packages = with pkgs; [$/;"	m
 packages	modules/mail/mbsync.nix	/^  home.packages = [ pkgs.isync ];$/;"	m
 packages	profiles/yuko-core.nix	/^  home.packages = with pkgs; [$/;"	m
 pkgs	flake.nix	/^        inherit pkgs;$/;"	m
@@ -189,11 +199,13 @@ type	modules/core.nix	/^        type = types.nullOr (types.attrsOf types.anythin
 type	modules/core.nix	/^        type = types.str;$/;"	m
 type	modules/core.nix	/^        type = types.str;$/;"	m
 type	modules/core.nix	/^      type = types.bool;$/;"	m
+type	modules/dev/nix/default.nix	/^      type = types.bool;$/;"	m
 type	modules/shell/default.nix	/^    type = lib.types.bool;$/;"	m
 types	modules/composer/cli.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 types	modules/composer/ctags.nix	/^  inherit (lib) mkOption types;$/;"	m
 types	modules/composer/local-bin.nix	/^  inherit (lib) mkOption mkIf types;$/;"	m
 types	modules/core.nix	/^  inherit (lib) mkOption types;$/;"	m
+types	modules/dev/nix/default.nix	/^  inherit (lib) mkOption types mkIf;$/;"	m
 url	flake.nix	/^      url = "github:nix-community\/home-manager";$/;"	m
 url	flake.nix	/^      url = "github:nix-community\/nixvim";$/;"	m
 url	flake.nix	/^    nixpkgs.url = "github:nixos\/nixpkgs\/nixos-unstable";$/;"	m

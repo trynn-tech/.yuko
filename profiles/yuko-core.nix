@@ -9,11 +9,12 @@
 
     # Shell + editor
     ../modules/editors/nixvim.nix
-    ../modules/shell/default.nix
-    ../modules/tmux/default.nix
+    ../modules/shell
+    ../modules/tmux
 
     # Composer
     ../modules/composer
+    ../modules/dev
 
     # Mail modules 
     ../modules/mail/accounts/trynn-primary.nix

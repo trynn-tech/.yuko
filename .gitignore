@@ -25,6 +25,7 @@ logs/
 # ctags / nix-doc tags
 .yuko/.tags/
 .tags/
+.tags/*
 tags
 
 # -------------------------
