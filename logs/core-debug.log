@@ -1,5 +1,0 @@
-# YukoNix manual steps
-# Generated: Wed Dec 10 08:17:46 UTC 2025
-
-- [mail/mbsync] Missing IMAP password in pass for trynn-primary: pass insert mail/trynn-tech-primary
-- [mail/msmtp] Missing SMTP password in pass for trynn-primary: pass insert mail/trynn-tech-primary

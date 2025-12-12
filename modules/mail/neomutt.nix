@@ -1,12 +1,17 @@
 # modules/mail/neomutt.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  active      = config.yuko.mail.activeAccount;
-  hmAccount   = config.yuko.mail.activeHmAccount;
+  active = config.yuko.mail.activeAccount;
+  hmAccount = config.yuko.mail.activeHmAccount;
   yukoAccount = config.yuko.mail.activeAccountMeta;
 
-  maildir     = yukoAccount.maildirBasePath;
+  maildir = yukoAccount.maildirBasePath;
 in
 {
   programs.neomutt.enable = true;

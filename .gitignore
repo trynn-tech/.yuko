@@ -25,7 +25,10 @@ logs/
 # ctags / nix-doc tags
 .yuko/.tags/
 .tags/
+.tags/*
 tags
+
+.ctags/
 
 # -------------------------
 # Editor / tooling cruft

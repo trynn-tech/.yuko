@@ -1,5 +1,10 @@
 # profiles/yuko-core.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 {
 
@@ -9,19 +14,19 @@
 
     # Shell + editor
     ../modules/editors/nixvim.nix
-    ../modules/shell/default.nix
-    ../modules/tmux/default.nix
+    ../modules/shell
+    ../modules/tmux
 
     # Composer
     ../modules/composer
+    ../modules/dev
 
-    # Mail modules 
+    # Mail modules
     ../modules/mail/accounts/trynn-primary.nix
     ../modules/mail/neomutt.nix
     ../modules/mail/mbsync.nix
     ../modules/mail/msmtp.nix
   ];
-
 
   # Profile-specific extras live here if needed
   # e.g. extra home.packages, host-specific stuff, etc.
@@ -50,16 +55,30 @@
   # -------------------------------
   # Toggle global FLAGs
   # -------------------------------
+  yuko = {
+    # Developer level scaffolding equipment
+    dev.nix.enable = true;
+    dev.nix.formatter = "nixfmt";
 
-  yuko.composer.cli.enable = true;
+    # Terminal Interface
+    shell.default = true;
 
-  # debug helper
-  yuko.debug.manualSteps = true;
+    # This explicitly enables the Zsh configuration defined in the new submodule.
+    # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
+    # but you can also set it explicitly here:
+    #shell.zsh.enable = true;
 
-  # Allow mail or mbsync/IMAP to create directories
-  yuko.security.mailLockdown = false;
+    # debug helper
+    debug.manualSteps = true;
 
-  yuko.composer.ctags.enable = true;
+    # Allow mail or mbsync/IMAP to create directories
+    security.mailLockdown = false;
+
+    # A Bit archaic and not very useful for Nix,
+    #first thought for semantics and may remove
+    composer.ctags.enable = true;
+
+  };
 
   # -------------------------------
   # Custom Semantic Compiler

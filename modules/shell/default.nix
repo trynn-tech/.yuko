@@ -1,93 +1,83 @@
 # modules/shell/default.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  cfg     = config.yuko.shell;
-  logStep = config.yuko.debug.logStep;
-in {
+  inherit (config.yuko.debug) logStep;
+
+  # Option definition is now in the submodule, but the default shell setting remains here
+  cfg = {
+    inherit (config.yuko.shell) default;
+  };
+
+in
+{
+
+  # 1. Import the Zsh submodule
+  imports = [
+    ./zsh
+  ];
+
+  # 2. Options for the overall shell setup (can be simplified if all options move to submodules)
   options.yuko.shell.default = lib.mkOption {
     type = lib.types.bool;
     default = false;
-    description = ''
-      If true, configure zsh and attempt to set /usr/bin/zsh as the login shell.
-      Fails gracefully and never aborts activation.
-    '';
+    description = "Optionally attempts to set the login shell to Zsh managed by Nix.";
   };
 
-  config =
-    {
-      programs.zsh = {
-        enable = true;
-        enableCompletion = true;
-        autosuggestions.enable = true;
-        syntaxHighlighting.enable = true;
+  # 3. Config block primarily handles the activation for setting the default shell
+  config = {
 
-      # Make sure Nix environment is available in zsh
-      initExtra = ''
-        # If the multi-user Nix profile script exists, source it
-        if [ -e "/nix/var/nix/profiles/per-user/$USER/profile/etc/profile.d/nix.sh" ]; then
-          . "/nix/var/nix/profiles/per-user/$USER/profile/etc/profile.d/nix.sh"
-        else
-          # Fallback: make sure common Nix paths are on PATH
-          export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/per-user/$USER/profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
-        fi
-      '';
-      };
-    }// lib.mkIf cfg.default {
-      home.activation.setDefaultShell =
-        lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          (
-            set +e
+    # Automatically enable the zsh configuration when the default shell option is requested.
+    yuko.shell.zsh.enable = lib.mkDefault cfg.default;
 
-            TARGET_SHELL="/usr/bin/zsh"
-            CHSH="/usr/bin/chsh"
+    # 4. Activation for setting the default shell (Zsh)
+    # The default shell setting remains here because it's an action performed
+    # outside of the Zsh configuration itself.
 
-            if [ ! -x "$TARGET_SHELL" ]; then
-              echo "Home Manager: $TARGET_SHELL not found; skipping login shell change."
-              echo "  Install zsh via your system package manager (e.g. 'sudo apt install zsh')."
-              ${logStep {
-                component = "shell";
-                message   = "Install zsh (e.g. 'sudo apt install zsh') so YukoNix can set it as login shell.";
-              }}
-              exit 0
-            fi
+    home.activation.setDefaultShell = lib.mkIf cfg.default (
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        (
+          set +e
+          # Use the shell installed by Home Manager/Nix (Zsh is now in home.packages)
+          TARGET_SHELL="${pkgs.zsh}/bin/zsh"
+          CHSH="$(command -v chsh || true)"
 
-            if [ ! -x "$CHSH" ]; then
-              echo "Home Manager: $CHSH not found; cannot change login shell automatically."
-              echo "  You can manually run:  chsh -s $TARGET_SHELL"
-              ${logStep {
-                component = "shell";
-                message   = "Install 'chsh' or run 'chsh -s /usr/bin/zsh' manually to change login shell.";
-              }}
-              exit 0
-            fi
-
-            if [ "$SHELL" = "$TARGET_SHELL" ]; then
-              echo "Home Manager: login shell already $TARGET_SHELL; nothing to do."
-              exit 0
-            fi
-
-            echo "Home Manager: attempting to set login shell to $TARGET_SHELL"
-            if "$CHSH" -s "$TARGET_SHELL"; then
-              echo "Home Manager: login shell updated to $TARGET_SHELL"
-              echo "  This will take effect for new terminals/logins; existing sessions remain unchanged."
-              ${logStep {
-                component = "shell";
-                message   = "Login shell changed to /usr/bin/zsh. Open a new terminal/tmux session to use it.";
-              }}
-            else
-              echo "Home Manager: could not change login shell (permissions or policy)."
-              echo "  Your current shell ($SHELL) remains active."
-              echo "  If you still want zsh as login shell, try manually:"
-              echo "    chsh -s $TARGET_SHELL"
-              ${logStep {
-                component = "shell";
-                message   = "Login shell change failed. Try 'chsh -s /usr/bin/zsh' manually if desired.";
-              }}
-            fi
-
+          if [ -z "$CHSH" ]; then
+            echo "Home Manager: 'chsh' not available; cannot set login shell automatically."
+            ${logStep {
+              component = "shell";
+              message = "'chsh' missing, login shell unchanged.";
+            }}
             exit 0
-          )
-        '';
-    };
+          fi
+
+          if [ "$SHELL" = "$TARGET_SHELL" ]; then
+            echo "Home Manager: login shell already $TARGET_SHELL"
+            exit 0
+          fi
+
+          echo "Home Manager: attempting to set login shell to $TARGET_SHELL"
+          if $CHSH -s "$TARGET_SHELL"; then
+            echo "Home Manager: login shell changed to $TARGET_SHELL."
+            ${logStep {
+              component = "shell";
+              message = "Login shell updated to Nix zsh.";
+            }}
+          else
+            echo "Home Manager: login shell change failed (permissions or policy)."
+            ${logStep {
+              component = "shell";
+              message = "Login shell change failed.";
+            }}
+          fi
+          exit 0
+        )
+      ''
+    );
+  };
 }

@@ -1,16 +1,21 @@
 # modules/mail/msmtp.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  cfg         = config.yuko.debug;
-  logStep     = cfg.logStep;
+  cfg = config.yuko.debug;
+  inherit (cfg) logStep;
 
   accountName = config.yuko.mail.activeAccount;
 
-  hmAccount   = config.yuko.mail.activeHmAccount;
+  hmAccount = config.yuko.mail.activeHmAccount;
   yukoAccount = config.yuko.mail.activeAccountMeta;
 
-  mailLog   = "$HOME/.yuko/logs/mail/msmtp.log";
+  mailLog = "$HOME/.yuko/logs/mail/msmtp.log";
   passEntry = yukoAccount.smtpPassEntry;
 in
 {
@@ -39,18 +44,17 @@ in
   };
 
   # Preflight: make sure SMTP secret exists and log directory can be used
-  home.activation.msmtpPreflight =
-    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p "$(dirname ${mailLog})"
+  home.activation.msmtpPreflight = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    mkdir -p "$(dirname ${mailLog})"
 
-      if ! ${pkgs.pass}/bin/pass show ${passEntry} >/dev/null 2>&1; then
-        echo "YukoNix: pass entry '${passEntry}' not found or unreadable."
-        echo "  Create it with:"
-        echo "    pass insert ${passEntry}"
-        ${logStep {
-          component = "mail/msmtp";
-          message   = "Missing SMTP password in pass for ${accountName}: pass insert ${passEntry}";
-        }}
-      fi
-    '';
+    if ! ${pkgs.pass}/bin/pass show ${passEntry} >/dev/null 2>&1; then
+      echo "YukoNix: pass entry '${passEntry}' not found or unreadable."
+      echo "  Create it with:"
+      echo "    pass insert ${passEntry}"
+      ${logStep {
+        component = "mail/msmtp";
+        message = "Missing SMTP password in pass for ${accountName}: pass insert ${passEntry}";
+      }}
+    fi
+  '';
 }

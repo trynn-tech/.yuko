@@ -1,5 +1,10 @@
 # modules/core.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   inherit (lib) mkOption types;
@@ -48,25 +53,30 @@ in
       };
 
       accounts = mkOption {
-        type = types.attrsOf (types.submodule ({ name, ... }: {
-          options = {
-            maildirBasePath = mkOption {
-              type = types.str;
-              description = "Base Maildir path for this account.";
-            };
+        type = types.attrsOf (
+          types.submodule (
+            { name, ... }:
+            {
+              options = {
+                maildirBasePath = mkOption {
+                  type = types.str;
+                  description = "Base Maildir path for this account.";
+                };
 
-            imapPassEntry = mkOption {
-              type = types.str;
-              description = "pass entry used for IMAP auth.";
-            };
+                imapPassEntry = mkOption {
+                  type = types.str;
+                  description = "pass entry used for IMAP auth.";
+                };
 
-            smtpPassEntry = mkOption {
-              type = types.str;
-              description = "pass entry used for SMTP auth.";
-            };
-          };
-        }));
-        default = {};
+                smtpPassEntry = mkOption {
+                  type = types.str;
+                  description = "pass entry used for SMTP auth.";
+                };
+              };
+            }
+          )
+        );
+        default = { };
         description = "All Yuko mail accounts (per-account metadata).";
       };
 
@@ -92,7 +102,8 @@ in
       cfg = config.yuko.debug;
 
       # Local helper for manual-step logging
-      logStep = { component, message }:
+      logStep =
+        { component, message }:
         lib.optionalString cfg.manualSteps ''
           LOG_FILE="$HOME/${cfg.manualLogPath}"
           mkdir -p "$(dirname "$LOG_FILE")"
@@ -102,11 +113,11 @@ in
 
       inherit (lib) attrByPath;
 
-      active       = config.yuko.mail.activeAccount;
-      hmAccounts   = config.accounts.email.accounts or {};
-      yukoAccounts = config.yuko.mail.accounts or {};
+      active = config.yuko.mail.activeAccount;
+      hmAccounts = config.accounts.email.accounts or { };
+      yukoAccounts = config.yuko.mail.accounts or { };
 
-      hmActive   = attrByPath [ active ] null hmAccounts;
+      hmActive = attrByPath [ active ] null hmAccounts;
       yukoActive = attrByPath [ active ] null yukoAccounts;
 
     in
@@ -125,23 +136,23 @@ in
       ########################################
       yuko.debug.logStep = logStep;
 
-      home.activation.yukoManualStepsInit =
-        lib.mkIf cfg.manualSteps
-          (lib.hm.dag.entryBefore [ "writeBoundary" ] ''
-            LOG_FILE="$HOME/${cfg.manualLogPath}"
-            mkdir -p "$(dirname "$LOG_FILE")"
-            : > "$LOG_FILE"
-            {
-              echo "# YukoNix manual steps"
-              echo "# Generated: $(date)"
-              echo
-            } >> "$LOG_FILE"
-          '');
+      home.activation.yukoManualStepsInit = lib.mkIf cfg.manualSteps (
+        lib.hm.dag.entryBefore [ "writeBoundary" ] ''
+          LOG_FILE="$HOME/${cfg.manualLogPath}"
+          mkdir -p "$(dirname "$LOG_FILE")"
+          : > "$LOG_FILE"
+          {
+            echo "# YukoNix manual steps"
+            echo "# Generated: $(date)"
+            echo
+          } >> "$LOG_FILE"
+        ''
+      );
 
       ########################################
       ## Derived mail meta
       ########################################
-      yuko.mail.activeHmAccount   = hmActive;
+      yuko.mail.activeHmAccount = hmActive;
       yuko.mail.activeAccountMeta = yukoActive;
 
       assertions = [

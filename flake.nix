@@ -21,35 +21,44 @@
   #========
   # Outputs
   #========
-  outputs = { self, nixpkgs, home-manager, nixvim, ... }:
-  let
-    system = "x86_64-linux";
+  outputs =
+    {
+      self,
+      nixpkgs,
+      home-manager,
+      nixvim,
+      ...
+    }:
+    let
+      system = "x86_64-linux";
 
-    pkgs = import nixpkgs { inherit system; };
+      pkgs = import nixpkgs { inherit system; };
 
-    yukoEnv =
-      if builtins.pathExists ./.yuko-env.nix
-      then import ./.yuko-env.nix
-      else import ./.yuko-env.example.nix;
+      yukoEnv =
+        if builtins.pathExists ./.yuko-env.nix then
+          import ./.yuko-env.nix
+        else
+          import ./.yuko-env.example.nix;
 
-  
-    mkYuko = { userName, homeDir }:
-      home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
+      mkYuko =
+        { userName, homeDir }:
+        home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
 
-        modules = [
-          ./profiles/yuko-core.nix
-          nixvim.homeModules.nixvim
-          {
-            home.username      = yukoEnv.userName;
-            home.homeDirectory = yukoEnv.homeDir;
-            home.stateVersion  = "23.11";
-          }
-        ];
+          modules = [
+            ./profiles/yuko-core.nix
+            nixvim.homeModules.nixvim
+            {
+              home.username = yukoEnv.userName;
+              home.homeDirectory = yukoEnv.homeDir;
+              home.stateVersion = "23.11";
+            }
+          ];
+        };
+    in
+    {
+      homeConfigurations = {
+        yuko-core = mkYuko yukoEnv;
       };
-  in {
-    homeConfigurations = {
-      yuko-core = mkYuko yukoEnv;
     };
-  };
 }
