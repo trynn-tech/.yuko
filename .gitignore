@@ -28,6 +28,8 @@ logs/
 .tags/*
 tags
 
+.ctags/
+
 # -------------------------
 # Editor / tooling cruft
 # -------------------------
