@@ -27,9 +27,8 @@ in
     ];
 
     # 2) Ensure directory exists on activation
-    home.activation.ensureLocalBin =
-      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p "${homeDir}/.local/bin"
-      '';
+    home.activation.ensureLocalBin = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      mkdir -p "${homeDir}/.local/bin"
+    '';
   };
 }

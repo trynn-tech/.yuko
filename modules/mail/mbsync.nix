@@ -1,27 +1,31 @@
 # modules/mail/mbsync.nix
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  cfg         = config.yuko.debug;
-  logStep     = cfg.logStep;
+  cfg = config.yuko.debug;
+  inherit (cfg) logStep;
 
   accountName = config.yuko.mail.activeAccount;
 
-  hmAccount   = config.yuko.mail.activeHmAccount;
+  hmAccount = config.yuko.mail.activeHmAccount;
   yukoAccount = config.yuko.mail.activeAccountMeta;
 
   maildirBase = yukoAccount.maildirBasePath;
-  passEntry   = yukoAccount.imapPassEntry;
+  passEntry = yukoAccount.imapPassEntry;
 in
 {
   # Ensure isync/mbsync is installed
   home.packages = [ pkgs.isync ];
 
   # Create the Maildir skeleton so mbsync has somewhere to write
-  home.activation.createMaildir =
-    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      mkdir -p ${lib.escapeShellArg maildirBase}/Inbox/{cur,new,tmp}
-    '';
+  home.activation.createMaildir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    mkdir -p ${lib.escapeShellArg maildirBase}/Inbox/{cur,new,tmp}
+  '';
 
   # Main isync/mbsync config
   xdg.configFile."isyncrc".text = ''
@@ -54,16 +58,15 @@ in
   '';
 
   # Preflight: make sure the pass secret exists
-  home.activation.mbsyncPreflight =
-    lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if ! ${pkgs.pass}/bin/pass show ${passEntry} >/dev/null 2>&1; then
-        echo "YukoNix: pass entry '${passEntry}' not found or unreadable."
-        echo "  Create it with:"
-        echo "    pass insert ${passEntry}"
-        ${logStep {
-          component = "mail/mbsync";
-          message   = "Missing IMAP password in pass for ${accountName}: pass insert ${passEntry}";
-        }}
-      fi
-    '';
+  home.activation.mbsyncPreflight = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    if ! ${pkgs.pass}/bin/pass show ${passEntry} >/dev/null 2>&1; then
+      echo "YukoNix: pass entry '${passEntry}' not found or unreadable."
+      echo "  Create it with:"
+      echo "    pass insert ${passEntry}"
+      ${logStep {
+        component = "mail/mbsync";
+        message = "Missing IMAP password in pass for ${accountName}: pass insert ${passEntry}";
+      }}
+    fi
+  '';
 }

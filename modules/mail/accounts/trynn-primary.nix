@@ -2,30 +2,30 @@
 { config, lib, ... }:
 
 let
-  home        = config.home.homeDirectory;
+  home = config.home.homeDirectory;
   accountName = "trynn-primary";
 in
 {
   accounts.email.accounts.${accountName} = {
     # Derived: this is primary iff it matches yuko.mail.activeAccount
-    primary = (config.yuko.mail.activeAccount == accountName);
+    primary = config.yuko.mail.activeAccount == accountName;
 
-    address  = "tristen@trynn.tech";
+    address = "tristen@trynn.tech";
     realName = "Tristen Young";
     userName = "tristen@trynn.tech";
 
     folders = {
-      inbox  = "INBOX";
-      sent   = "Sent";
+      inbox = "INBOX";
+      sent = "Sent";
       drafts = "Drafts";
-      trash  = "Trash";
+      trash = "Trash";
     };
 
     imap = {
       host = "mail.hover.com";
       port = 993;
       tls = {
-        enable      = true;
+        enable = true;
         useStartTls = false; # 993 = implicit TLS
       };
     };
@@ -34,7 +34,7 @@ in
       host = "mail.hover.com";
       port = 465;
       tls = {
-        enable      = true;
+        enable = true;
         useStartTls = false; # 465 = implicit TLS (smtps)
       };
     };
@@ -42,7 +42,7 @@ in
 
   yuko.mail.accounts.${accountName} = {
     maildirBasePath = "${home}/Mail/${accountName}";
-    imapPassEntry   = "mail/trynn-tech-primary";
-    smtpPassEntry   = "mail/trynn-tech-primary";
+    imapPassEntry = "mail/trynn-tech-primary";
+    smtpPassEntry = "mail/trynn-tech-primary";
   };
 }
