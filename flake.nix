@@ -1,3 +1,4 @@
+# .yuko/flake.nix
 {
 
   description = "YukoNix Scaffold – Home Manager + nixvim profiles";
@@ -41,12 +42,12 @@
           import ./.yuko-env.example.nix;
 
       mkYuko =
-        { userName, homeDir }:
+        { userName, homeDir, profilePath }:
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
 
           modules = [
-            ./profiles/yuko-core.nix
+            profilePath 
             nixvim.homeModules.nixvim
             {
               home.username = yukoEnv.userName;
@@ -58,7 +59,15 @@
     in
     {
       homeConfigurations = {
-        yuko-core = mkYuko yukoEnv;
+        yuko-core = mkYuko {
+          inherit (yukoEnv) userName homeDir;
+          profilePath = ./profiles/yuko-core.nix; # Pass the core profile file
+        };
+
+        "yuko-dev" = mkYuko {
+          inherit (yukoEnv) userName homeDir;
+          profilePath = ./profiles/yuko-dev.nix; # Pass the new dev profile file
+        };
       };
     };
 }

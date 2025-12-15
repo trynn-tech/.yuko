@@ -120,14 +120,13 @@ in
       hmActive = attrByPath [ active ] null hmAccounts;
       yukoActive = attrByPath [ active ] null yukoAccounts;
 
+      mailConfigured = builtins.length (builtins.attrNames yukoAccounts) > 0;
+
     in
     {
       ########################################
       ## Core Home Manager basics
       ########################################
-      #home.username      = config.home.username;
-      #home.homeDirectory = config.home.homeDirectory;
-      #home.stateVersion  = config.home.stateVersion;
 
       programs.home-manager.enable = true;
 
@@ -155,7 +154,9 @@ in
       yuko.mail.activeHmAccount = hmActive;
       yuko.mail.activeAccountMeta = yukoActive;
 
-      assertions = [
+      # CONDITIONAL ASSERTION: This assertion only runs if a mail module 
+      # has been imported and defined accounts (i.e., mailConfigured is true).
+      assertions = lib.mkIf mailConfigured [
         {
           assertion = yukoActive != null;
           message =

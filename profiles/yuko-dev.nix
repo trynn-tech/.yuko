@@ -1,4 +1,4 @@
-# profiles/yuko-core.nix
+# profiles/yuko-dev.nix
 {
   config,
   lib,
@@ -9,23 +9,18 @@
 {
 
   imports = [
-    # Core
+    # --- CORE FRAMEWORK ---
     ../modules/core.nix
 
-    # Shell + editor
+    # --- EDITORS & SHELL (Required for code editing/interaction) ---
     ../modules/editors/nixvim.nix
     ../modules/shell
-
-    # Composer
-    ../modules/composer
+    
+    # ---  DEV TOOLS (Required for semantic/Nix tooling) ---
     ../modules/dev
-
-    # Mail modules
-    ../modules/mail
   ];
 
   # Profile-specific extras live here if needed
-  # e.g. extra home.packages, host-specific stuff, etc.
 
   # Enable HM managing itself
   programs.home-manager.enable = true;
@@ -33,14 +28,16 @@
   # -------------------------------
   # Global packages available to Yuko
   # -------------------------------
+  # We keep the essential packages for a development environment
   home.packages = with pkgs; [
     git
     ripgrep
     fd
     fzf
-    pass
-    isync
-    msmtp
+    
+    # Keeping 'pass', 'isync', 'msmtp' is optional but since they are small,
+    # let's keep only the absolute necessities for a developer terminal:
+    pass # for secrets access
   ];
 
   # -------------------------------
@@ -49,7 +46,7 @@
   home.sessionVariables.EDITOR = "nvim";
 
   # -------------------------------
-  # Toggle global FLAGs
+  # Toggle global FLAGs (Mirroring the desired core settings)
   # -------------------------------
   yuko = {
     # Developer level scaffolding equipment
@@ -59,32 +56,21 @@
     # Terminal Interface
     shell.default = true;
 
-    # This explicitly enables the Zsh configuration defined in the new submodule.
-    # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
-    # but you can also set it explicitly here:
-    #shell.zsh.enable = true;
-
     # debug helper
     debug.manualSteps = true;
 
-    # Allow mail or mbsync/IMAP to create directories
-    security.mailLockdown = false;
+    # No need to set mail flags here since mail modules aren't imported.
 
-    # A Bit archaic and not very useful for Nix,
-    #first thought for semantics and may remove
-    composer.ctags.enable = true;
-
+    # Composer Ctags
+    #composer.ctags.enable = true;
   };
 
   # -------------------------------
-  # Custom Semantic Compiler
+  # Custom Semantic Compiler (Remains, as it's useful for editing Nix code)
   # -------------------------------
-  yuko.composer.ctags.extraConfig = ''
-    # Treat *.nix as Nix (if needed)
-    --langmap=Nix:.nix
-
-    # Later: USL / Forge / yuko.* patterns here
-    # Adjunct definition of code here ...
-  '';
+  #yuko.composer.ctags.extraConfig = ''
+  #  # Treat *.nix as Nix (if needed)
+  #  --langmap=Nix:.nix
+  #'';
 
 }
