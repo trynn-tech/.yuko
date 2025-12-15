@@ -89,17 +89,11 @@ in
         gs = "git status";
         "~" = "cd ~";
 
-        # YUKO_ALIAS_DOC: Invokes the 'pay-respects' command (replaces 'fuck').
-        f = ''eval "$(pay-respects zsh)"''; 
-        # YUKO_ALIAS_DOC: Clears current shell history and the zoxide directory history.
-        history_clean_all = ''
-          history -c \
-          && ${pkgs.gnused}/bin/sed -i '/^#\+ /d' ~/.zsh_history \
-          && rm -f "$(${pkgs.zoxide}/bin/zoxide data)" \
-          && echo "Current session, zsh history file, and zoxide history cleared." \
-          && history -r
-        '';
+	#----- Charm Bubbletea Software -------
+        # YUKO_ALIAS_DOC: Renders Markdown files using Glow.
+        mg = "glow";
 
+	#----- Yuko Nix Maintenance -------
         # YUKO_ALIAS_DOC: Change directory to the root of the Yuko configuration.
         cy = "cd ${yukoRoot}/.yuko";
         # YUKO_ALIAS_DOC: Change directory to the Yuko modules directory.
@@ -116,7 +110,19 @@ in
         ybuild = "cd ${yukoRoot}/.yuko && home-manager build --flake .#yuko-core";
         # YUKO_ALIAS_DOC: Switches to the Home Manager configuration for the current user.
         ym = "cd ${yukoRoot}/.yuko && home-manager switch --flake .#yuko-core";
-        # YUKO_ALIAS_DOC: Runs the 'yuko_snowball' maintenance function.
+
+        # YUKO_ALIAS_DOC: Invokes the 'pay-respects' command (replaces 'fuck').
+        f = ''eval "$(pay-respects zsh)"''; 
+        # YUKO_ALIAS_DOC: Clears current shell history and the zoxide directory history.
+        history_clean_all = ''
+          history -c \
+          && ${pkgs.gnused}/bin/sed -i '/^#\+ /d' ~/.zsh_history \
+          && rm -f "$(${pkgs.zoxide}/bin/zoxide data)" \
+          && echo "Current session, zsh history file, and zoxide history cleared." \
+          && history -r
+        '';
+
+        # YUKO_ALIAS_DOC: Runs the 'yuko_snowball' maintenance function. ... mostly an example to customize
         ysnow = "yuko_snowball";
       };
 
@@ -209,8 +215,34 @@ in
       git
       fzf 
 
+      #========================
+      #===== Shell Adjunct ====
+      #========================
+
+# We list zoxide, thefuck, and taskwarrior here for robustness, although their
+      # dedicated programs modules above often handle the package dependency as well.
+      # Listing them explicitly is a good habit.
+      zoxide
+      pay-respects
+
+
+      # YUKO_PACKAGE_DOC: Simple, fast, and community-driven man pages.
+      tealdeer 
+
+      #========================
+      #===== Frameworks =======
+      #========================
+
+      # YUKO_PACKAGE_DOC: A terminal interface for Git.
+      tig 
+      
+      # YUKO_PACKAGE_DOC: Taskfile.dev task runner, cross-platform method for automating cli w/ YAML
+      go-task
+
+      # YUKO_PACKAGE_DOC: a terminal Markdown reader/previewer for nice CLI rendering of docs
+      glow
+
       # YUKO_PACKAGE_DOC: Taskwarrior (2.x branch).
-      # FIX: Rename the binary to 'tw' and remove ALL conflicting completion scripts
       (taskwarrior2.overrideAttrs (old: { 
         # The build process is complete, so we use postInstall to modify the output directory ($out)
         postInstall = (old.postInstall or "") + ''
@@ -224,20 +256,7 @@ in
         '';
       }))
 
-      # Taskfile.dev task runner , cross-platform method for automating command-line tasks using a simple YAML file instead of complex scripts
-      go-task
-
-      # YUKO_PACKAGE_DOC: Simple, fast, and community-driven man pages.
-      tealdeer 
-      
-      # YUKO_PACKAGE_DOC: A terminal interface for Git.
-      tig 
-      
-      # We list zoxide, thefuck, and taskwarrior here for robustness, although their
-      # dedicated programs modules above often handle the package dependency as well.
-      # Listing them explicitly is a good habit.
-      zoxide
-      pay-respects
     ];
+
   };
 }

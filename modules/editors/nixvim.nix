@@ -1,3 +1,4 @@
+# modules/editors/nixvim.nix
 { config, pkgs, ... }:
 
 {
