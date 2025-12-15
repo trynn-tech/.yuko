@@ -112,6 +112,8 @@ in
         ym = "cd ${yukoRoot}/.yuko && home-manager switch --flake .#yuko-core";
         #YUKO_ALIAS_DOC: Switches to the Home Manager Development configuration for the current user.
         yd = "cd ${yukoRoot}/.yuko && home-manager switch --flake .#yuko-dev";
+        #YUKO_ALIAS_DOC: Switches to the Home Manager Development configuration for the current user.
+        yf = "cd ${yukoRoot}/.yuko && home-manager switch --flake .#yuko-full";
 
         # YUKO_ALIAS_DOC: Invokes the 'pay-respects' command (replaces 'fuck').
         f = ''eval "$(pay-respects zsh)"''; 

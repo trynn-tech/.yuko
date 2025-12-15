@@ -18,6 +18,8 @@
     
     # ---  DEV TOOLS (Required for semantic/Nix tooling) ---
     ../modules/dev
+
+    ../modules/syncthing/default.nix
   ];
 
   # Profile-specific extras live here if needed
