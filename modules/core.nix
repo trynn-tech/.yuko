@@ -48,7 +48,7 @@ in
     yuko.mail = {
       activeAccount = mkOption {
         type = types.str;
-        default = "trynn-primary";
+        default = if config.home.username == "trynn" then "trynn-primary" else "none";
         description = "Name of the currently active mail account.";
       };
 
