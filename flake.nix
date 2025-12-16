@@ -49,8 +49,8 @@
             ./profiles/yuko-core.nix
             nixvim.homeModules.nixvim
             {
-              home.username = yukoEnv.userName;
-              home.homeDirectory = yukoEnv.homeDir;
+              home.username = userName;
+              home.homeDirectory = homeDir;
               home.stateVersion = "23.11";
             }
           ];

@@ -1,48 +1,90 @@
-# modules/mail/accounts/trynn-primary.nix
-{ config, lib, ... }:
+# modules/core.nix
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
-  home = config.home.homeDirectory;
-  accountName = "trynn-primary";
+  inherit (lib) mkOption types;
+
+  # --- CRITICAL VARIABLE FOR CONDITIONAL LOGIC ---
+  # Check if the current deployment is for the personal user ("trynn")
+  isPersonalUser = config.home.username == "trynn";
+
+  # Define a safe, inert default account name for non-personal users
+  safeDefaultAccount = "none";
 in
 {
-  accounts.email.accounts.${accountName} = {
-    # Derived: this is primary iff it matches yuko.mail.activeAccount
-    primary = config.yuko.mail.activeAccount == accountName;
 
-    address = "tristen@trynn.tech";
-    realName = "Tristen Young";
-    userName = "tristen@trynn.tech";
+  ########################################
+  ## CONFIG (derived values + basics)
+  ########################################
+  config =
+    let
+      cfg = config.yuko.debug;
+      
+      # Local helper for manual-step logging (unchanged)
+      logStep = { component, message }: lib.optionalString cfg.manualSteps ''
+        LOG_FILE="$HOME/${cfg.manualLogPath}"
+        mkdir -p "$(dirname "$LOG_FILE")"
+        echo "- [${component}] ${message}" >> "$LOG_FILE"
+        echo "YukoNix/manual-step [${component}]: ${message}"
+      '';
 
-    folders = {
-      inbox = "INBOX";
-      sent = "Sent";
-      drafts = "Drafts";
-      trash = "Trash";
+      inherit (lib) attrByPath;
+      
+      active = config.yuko.mail.activeAccount;
+      hmAccounts = config.accounts.email.accounts or { };
+      yukoAccounts = config.yuko.mail.accounts or { };
+
+      hmActive = attrByPath [ active ] null hmAccounts;
+      yukoActive = attrByPath [ active ] null yukoAccounts;
+
+    in
+    {
+      ########################################
+      ## Core Home Manager basics (unchanged)
+      ########################################
+      programs.home-manager.enable = true;
+
+      ########################################
+      ## Wire debug helper + init (unchanged)
+      ########################################
+      yuko.debug.logStep = logStep;
+
+      home.activation.yukoManualStepsInit = lib.mkIf cfg.manualSteps (
+        lib.hm.dag.entryBefore [ "writeBoundary" ] ''
+          LOG_FILE="$HOME/${cfg.manualLogPath}"
+          mkdir -p "$(dirname "$LOG_FILE")"
+          : > "$LOG_FILE"
+          {
+            echo "# YukoNix manual steps"
+            echo "# Generated: $(date)"
+            echo
+          } >> "$LOG_FILE"
+        ''
+      );
+
+      ########################################
+      ## Derived mail meta
+      ########################################
+      yuko.mail.activeHmAccount = hmActive;
+      yuko.mail.activeAccountMeta = yukoActive;
+
+      # --- REFACTOR: CONDITIONAL ASSERTION ---
+      assertions = [
+        {
+          # Only assert that the account exists if the active account is NOT the inert default.
+          assertion = (active == safeDefaultAccount) || (yukoActive != null);
+          message =
+            "yuko.mail.activeAccount is set to "
+            + active
+            + " but yuko.mail.accounts does not contain that key. The expected user is: "
+            + config.home.username;
+        }
+      ];
     };
-
-    imap = {
-      host = "mail.hover.com";
-      port = 993;
-      tls = {
-        enable = true;
-        useStartTls = false; # 993 = implicit TLS
-      };
-    };
-
-    smtp = {
-      host = "mail.hover.com";
-      port = 465;
-      tls = {
-        enable = true;
-        useStartTls = false; # 465 = implicit TLS (smtps)
-      };
-    };
-  };
-
-  yuko.mail.accounts.${accountName} = {
-    maildirBasePath = "${home}/Mail/${accountName}";
-    imapPassEntry = "mail/trynn-tech-primary";
-    smtpPassEntry = "mail/trynn-tech-primary";
-  };
 }
+

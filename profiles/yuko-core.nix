@@ -22,10 +22,7 @@
     ../modules/dev
 
     # Mail modules
-    ../modules/mail/accounts/trynn-primary.nix
-    ../modules/mail/neomutt.nix
-    ../modules/mail/mbsync.nix
-    ../modules/mail/msmtp.nix
+    ../modules/mail
   ];
 
   # Profile-specific extras live here if needed

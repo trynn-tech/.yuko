@@ -20,6 +20,7 @@ in
   # 1. Import the Zsh submodule
   imports = [
     ./zsh
+    ./tig
   ];
 
   # 2. Options for the overall shell setup (can be simplified if all options move to submodules)
