@@ -17,6 +17,9 @@
     ../modules/shell
     ../modules/tmux
 
+    # Display 
+    ../modules/shell/i3.nix 
+
     # Composer
     ../modules/composer
     ../modules/dev

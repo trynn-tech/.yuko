@@ -1,3 +1,5 @@
+# modules/tmux/default.nix
+
 {
   config,
   lib,

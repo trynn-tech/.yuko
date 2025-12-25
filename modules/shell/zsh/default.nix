@@ -101,9 +101,9 @@ in
         '';
 
         # YUKO_ALIAS_DOC: Change directory to the root of the Yuko configuration.
-        cy = "cd ${yukoRoot}/.yuko";
+        nh = "cd /etc/nixos";
         # YUKO_ALIAS_DOC: Change directory to the Yuko modules directory.
-        cm = "cd ${yukoRoot}/.yuko/modules";
+        ny = "cd ${yukoRoot}/.yuko";
         # YUKO_ALIAS_DOC: Opens Neovim.
         n = "nvim";
         # YUKO_ALIAS_DOC: Formats all Nix files in the Yuko root.
