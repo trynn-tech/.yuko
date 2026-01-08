@@ -1,4 +1,5 @@
-# modules/composer/default.nix
+# modules/dev/default.nix
+
 { ... }:
 {
   imports = [

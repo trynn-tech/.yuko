@@ -53,7 +53,10 @@
   # -------------------------------
   # Global env vars
   # -------------------------------
-  home.sessionVariables.EDITOR = "nvim";
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    PATH = "$HOME/.local/bin:$PATH";
+  };
 
   # -------------------------------
   # Toggle global FLAGs

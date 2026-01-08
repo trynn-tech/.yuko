@@ -27,8 +27,7 @@ logs/
 .tags/
 .tags/*
 tags
-
-.ctags/
+.ctags
 
 # -------------------------
 # Editor / tooling cruft
