@@ -26,17 +26,17 @@
 
   programs.zsh.initExtra = ''
     # --- Taskwarrior Mobile Workflow Logic ---
-    _proj() {
-      local p=$1 action=$2; shift 2
-      case $action in
-        c) task add project:"$p" "$@" ;;
-        r) task project:"$p" list ;;
-        u) task "$1" modify "''${@:2}" ;;
-        d) task "$1" delete ;;
-        *) task project:"$p" "$action" "$@" ;;
-      esac
-    }
-
+   _proj() {
+     local p=$1 action=$2; shift 2
+     case $action in
+       c) task add project:"$p" "$@" ;;
+       r) task project:"$p" list ;;
+       u) task "$1" modify "''${@:2}" ;;
+       d) task "$1" done ;;      # Changed from delete to done for record keeping
+       rm) task "$1" delete ;;    # Keep rm for actual deletions
+       *) task project:"$p" "$action" "$@" ;;
+     esac
+   }
     _ctx() {
       task context define "$1" project:"$1" 2>/dev/null
       task context "$1"
@@ -67,13 +67,17 @@
       echo -e "[$bar\033[1;30m] $percent%"
     }
 
-    # Generate s, t, w, r project keys
-    for entry in "s:System" "t:Taskwiki" "w:Work" "r:Radiant-Pact"; do
-      key="''${entry%%:*}"; name="''${entry#*:}"
-      alias "''${key}c"="_proj $name c"
-      alias "''${key}r"="_proj $name r"
-      alias "''${key}x"="_ctx $name"
-    done
+   # Generate s, t, w, r, l keys
+   for entry in "s:Software" "y:Yuko's Workshop" "w:Re-l" "e:emporium" "r:Radiant-Pact" "l:Life"; do
+     key="''${entry%%:*}"; name="''${entry#*:}"
+     alias "''${key}c"="_proj $name c"
+     alias "''${key}r"="_proj $name r"
+     alias "''${key}x"="_ctx $name"
+     alias "''${key}u"="_proj $name u"
+     alias "''${key}d"="_proj $name d"
+   done
+   
+   alias cx="task context none && clear && echo -e '\033[1;32mContext Cleared\033[0m'"
   '';
 }
 
