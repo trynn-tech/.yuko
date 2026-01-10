@@ -27,6 +27,7 @@ logs/
 .tags/
 .tags/*
 tags
+.ctags
 
 .ctags/
 

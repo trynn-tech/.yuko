@@ -33,15 +33,14 @@ let
       yk grep PATTERN        ripgrep in ${yukoRoot}
       yk files               fzf over files and open in ${editorBin}
       yk tag NAME            jump to first tag NAME using .tags/tags
-      yk board               show yuko:todo/doing/done kanban and jump
+      yk board               show yuko:<todo/doing/done> kanban and jump
+      yk doc                 To be implemented, grep # yuko:doc for further functions 
 
     Conventions:
       - Repo root: ${yukoRoot}
       - Tags file: ${tagsFile}
       - Inline kanban markers:
-          # yuko:todo  short description
-          # yuko:doing working on X
-          # yuko:done  finished Y
+          # yuko:example  (todo|doing|done)
     EOF
         }
 
@@ -175,7 +174,7 @@ let
           )"
 
           if [ -z "$raw" ]; then
-            echo "yk board: no yuko:todo/doing/done markers found in $YK_ROOT"
+            echo "yk board: no yuko:<todo/doing/done> markers found in $YK_ROOT"
             return 0
           fi
 

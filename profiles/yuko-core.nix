@@ -17,6 +17,9 @@
     ../modules/shell
     ../modules/tmux
 
+    # Display 
+    ../modules/shell/i3.nix 
+
     # Composer
     ../modules/composer
     ../modules/dev
@@ -50,7 +53,10 @@
   # -------------------------------
   # Global env vars
   # -------------------------------
-  home.sessionVariables.EDITOR = "nvim";
+  home.sessionVariables = {
+    EDITOR = "nvim";
+    PATH = "$HOME/.local/bin:$PATH";
+  };
 
   # -------------------------------
   # Toggle global FLAGs

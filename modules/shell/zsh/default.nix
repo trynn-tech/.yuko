@@ -1,81 +1,112 @@
 # modules/shell/zsh/default.nix
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, lib, pkgs, ... }:
 
 let
   yukoRoot = config.home.homeDirectory;
+  yukoFlake = "${yukoRoot}/.yuko";
+  p10kPath = "${pkgs.zsh-powerlevel10k}/share/zsh-powerlevel10k";
+  
+  # PINNED PATHS: Resolves the _task collision and fixes binary paths
+  tw3Bin = "/nix/store/2r0ryqw8ay9fs38rj38q3bfzv47drija-taskwarrior-3.4.2/bin/task";
+  goTaskBin = "${pkgs.go-task}/bin/task";
 
   yukoZshFunctionContent = ''
-    # --- YUKO CUSTOM SHELL CODE START ---
-    
-    # --- Nix Profile Sourcing ---
-    if [ -e "/nix/var/nix/profiles/per-user/$USER/profile/etc/profile.d/nix.sh" ]; then
-      . "/nix/var/nix/profiles/per-user/$USER/profile/etc/profile.d/nix.sh"
-    else
-      export PATH="$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
-    fi
+    # YUKO_SNOWBALL: Formats, adds to git, and switches home-manager
 
-    # --- Yuko snowball command (Function Definitions) ---
     yuko_snowball() {
-      # Use $HOME/.yuko for robustness
-      cd "$HOME/.yuko" || return 1
-      local yuko_status=0
-
-      echo "[yuko] formatting nix…"
-      if command -v nix fmt >/dev/null 2>&1; then
-        nix fmt . || yuko_status=1
-      elif command -v nixfmt >/dev/null 2>&1; then
-        nixfmt **/*.nix || yuko_status=1
-      else
-        echo "[yuko] no nix formatter (nix fmt / nixfmt) found"
-      fi
-
-      echo "[yuko] statix pass…"
-      command -v statix >/dev/null 2>&1 && statix fix . || echo "[yuko] statix not found, skipping"
-
-      echo "[yuko] deadnix pass…"
-      command -v deadnix >/dev/null 2>&1 && deadnix . || echo "[yuko] deadnix not found, skipping"
-
-      return $yuko_status
+    cd "${yukoFlake}" || return 1
+      echo "[yuko] formatting..."
+      nix fmt . 2>/dev/null
+      git add .
+      echo "[yuko] activating configuration..."
+      # Using the verbose command you prefer:
+      home-manager switch --flake .#yuko-core
     }
-    # --- YUKO CUSTOM SHELL CODE END ---
+
+    # YUKO_TRIAGE: The 'it' function for Inbox Space/Time Management
+    yuko_triage() {
+      while [[ $(${tw3Bin} +inbox count) -gt 0 ]]; do
+        echo "--- Next Inbox Item ---"
+        ${tw3Bin} +inbox +READY sort:entry+ limit:1
+        echo ""
+        echo "TEMPORAL LOGIC: due:today (Milestone) | sch:tmw (Process) | wait:1w (Space)"
+        echo -n "Triage (Modify ID <args> / 'q' to quit): "
+        read -r cmd
+        [[ "$cmd" == "q" ]] && break
+        # Append -inbox to ensure the task leaves the triage list
+        ${tw3Bin} $cmd -inbox
+      done
+      echo "[yuko] Inbox cleared."
+    }
   '';
 
   yukoZshSourceFile = pkgs.writeText "yuko-zsh-functions.zsh" yukoZshFunctionContent;
-
 in
 {
+  imports = [ ./taskwarrior.nix ];
 
-  options.yuko.shell.zsh = {
-    enable = lib.mkEnableOption "Zsh shell configuration (including yk helper functions/aliases).";
-  };
+  # 1. OPTION DEFINITION (Crucial: Must be at top-level)
+  options.yuko.shell.zsh.enable = lib.mkEnableOption "Zsh configuration";
 
+  # 2. CONFIGURATION IMPLEMENTATION
   config = lib.mkIf config.yuko.shell.zsh.enable {
-
     programs.zsh = {
       enable = true;
       enableCompletion = true;
-      syntaxHighlighting.enable = true;
-      
+
       shellAliases = {
-        yfmt = "cd ${yukoRoot}/.yuko && (nix fmt . || nixfmt **/*.nix)";
-        ylint = "cd ${yukoRoot}/.yuko && statix check . && deadnix .";
-        yfix = "cd ${yukoRoot}/.yuko && statix fix . && deadnix .";
-        ybuild = "cd ${yukoRoot}/.yuko && home-manager build --flake .#yuko-core";
+        # Navigation
+        ll = "ls -lh"; la = "ls -lah"; l = "ls -la";
+        gs = "git status"; n = "nvim";
+        cy = "cd ${yukoFlake}";           # Root of Yuko
+        cm = "cd ${yukoFlake}/modules";  # Modules directory
+        cn = "cd /etc/nixos";             # System Root (Renamed from nh)
+        
+        # Maintenance
+        ym = "yuko_snowball";
         ysnow = "yuko_snowball";
+
+        # Taskwarrior 3 (Spacetime Braid)
+        task = "${tw3Bin}";
+        ic = "${tw3Bin} add +inbox";
+        ir = "${tw3Bin} +inbox list";
+        it = "yuko_triage";
+        vwi = "nvim ~/yang_wiki/index.md";
+        ip = "${tw3Bin} modify";
+
+        # Go-Task
+        tk = "${goTaskBin}"; 
       };
 
-      initExtra = ''source ${yukoZshSourceFile}'';
+      initContent = ''
+        export FLAKE="${yukoFlake}"
+        typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
+        [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme
+        
+        source ${yukoZshSourceFile}
+        source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+        source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+        
+        [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+        
+        # Completion fix for pinned binary
+        compdef _task ${tw3Bin}
+      '';
+    };
+
+    programs.zoxide = {
+      enable = true;
+      enableZshIntegration = true;
     };
 
     home.packages = with pkgs; [
-      zsh
-      zsh-autosuggestions
-      zsh-syntax-highlighting
+      taskwarrior3
+      nh
+      gnused
+      tree
+      git
+      fzf
+      tig
     ];
   };
 }
