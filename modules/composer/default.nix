@@ -5,5 +5,6 @@
     ./cli.nix
     ./local-bin.nix
     ./ctags.nix
+    ./aider.nix
   ];
 }

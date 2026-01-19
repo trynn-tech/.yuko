@@ -20,6 +20,7 @@ in
   # 1. Import the Zsh submodule
   imports = [
     ./zsh
+    ./ledger.nix
   ];
 
   # 2. Options for the overall shell setup (can be simplified if all options move to submodules)
@@ -34,6 +35,7 @@ in
 
     # Automatically enable the zsh configuration when the default shell option is requested.
     yuko.shell.zsh.enable = lib.mkDefault cfg.default;
+    yuko.shell.ledger.enable = lib.mkDefault cfg.default;
 
     # 4. Activation for setting the default shell (Zsh)
     # The default shell setting remains here because it's an action performed
@@ -81,3 +83,4 @@ in
     );
   };
 }
+

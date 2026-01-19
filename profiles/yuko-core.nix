@@ -17,12 +17,15 @@
     ../modules/shell
     ../modules/tmux
 
-    # Display 
+    # Display -- consider moving to Programs modules
     ../modules/shell/i3.nix 
 
     # Composer
     ../modules/composer
     ../modules/dev
+
+    # Program modules
+    ../modules/programs
 
     # Mail modules
     ../modules/mail/accounts/trynn-primary.nix
@@ -68,6 +71,9 @@
 
     # Terminal Interface
     shell.default = true;
+
+    # Artificial Intelligence Pair Programmer
+    composer.aider.enable = true;
 
     # This explicitly enables the Zsh configuration defined in the new submodule.
     # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
