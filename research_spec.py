@@ -1,5 +1,10 @@
-import redis
-import time
-import os
+# -*- coding: utf-8 -*-
 
-def read
+import os
+import redis
+import markdown
+import datetime
+from typing import Dict
+
+def read_markdown_file(file_path: str) -> str:
+    with open(file_path, '
