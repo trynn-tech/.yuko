@@ -64,7 +64,7 @@ in
   	yuko-arch = "OPENAI_API_KEY=unused nix run nixpkgs#aider-chat -- --openai-api-base http://localhost:8081/v1 --model openai/architect --architect --edit-format editor-diff --no-stream --auto-commits";
       };
 
-      initExtra = ''
+      initContent = ''
         export FLAKE="${yukoFlake}"
         
         if [ -e "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then

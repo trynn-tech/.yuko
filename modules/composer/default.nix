@@ -6,5 +6,6 @@
     ./local-bin.nix
     ./ctags.nix
     ./aider.nix
+    ./researcher.nix 
   ];
 }
