@@ -6,3 +6,5 @@
     new_window = 'none';
     # Add a new option to set the workspace layout to 'tabbed'
     workspace_layout = 'tabbed';
+  };
+}
