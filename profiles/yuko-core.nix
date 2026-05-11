@@ -18,7 +18,7 @@
     ../modules/tmux
 
     # Display -- consider moving to Programs modules
-    ../modules/shell/i3.nix 
+    ../modules/desktop
 
     # Composer
     ../modules/composer

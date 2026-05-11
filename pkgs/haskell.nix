@@ -1,1 +1,0 @@
-{ pkgs ? import <nixpkgs/nixpkgs-unstable> { overlays = [ (self: super: { haskell = super.haskell // { packages =

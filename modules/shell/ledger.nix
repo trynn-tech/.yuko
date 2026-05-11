@@ -9,7 +9,7 @@
     home.packages = [ pkgs.ledger ];
 
     home.sessionVariables = {
-      FINANCE_DIR = "${config.home.homeDirectory}/yang_wiki/finance";
+      FINANCE_DIR = "${config.home.homeDirectory}/wiki_yuko/finance";
       LEDGER_FILE = "$FINANCE_DIR/journal.ledger";
       KARMA_FILE   = "$FINANCE_DIR/karma.ledger";
       PERS_FILE    = "$FINANCE_DIR/personal.ledger";

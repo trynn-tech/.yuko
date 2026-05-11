@@ -11,7 +11,12 @@ in
   options.yuko.shell.zsh.enable = lib.mkEnableOption "Zsh and Taskwarrior configuration";
 
   config = lib.mkIf config.yuko.shell.zsh.enable {
-    
+
+    home.sessionVariables = {
+      EDITOR = "nvim";
+      VISUAL = "nvim";
+    };
+
     # Restoring zoxide (z)
     programs.zoxide = {
       enable = true;
@@ -28,7 +33,7 @@ in
       package = pkgs.taskwarrior3;
       extraConfig = ''
         data.location=~/.local/share/task
-        sync.server.url=http://100.64.55.98:8080
+        sync.server.url=http://100.117.104.112:8080
         sync.server.client_id=58f0b3c8-9c13-427d-8921-1cebfe441a70
         sync.encryption_secret=HelloInternet42!
         confirmation=no
@@ -49,7 +54,8 @@ in
       enableCompletion = true;
 
       shellAliases = {
-        ll = "ls -lh"; la = "ls -lah"; l = "ls -la";
+        ll = "ls -la"; la = "ls -lah"; l = "ls -lh"; # Describe directory elements
+        size = "du -hs"; ds = "du -hs"; # Print directory data volume
         gs = "git status"; n = "nvim";
         cy = "cd ${yukoFlake}";
         cs = "cd /etc/nixos";
@@ -57,8 +63,12 @@ in
         task = "${taskBin}";
         ic = "${taskBin} add +inbox";
         ir = "${taskBin} +inbox list";
-        vwi = "nvim ~/yang_wiki/index.md";
+        vwi = "nvim ~/wiki_yuko/index.md";
         t = "task";
+        te = "task edit";
+        tu = "task modify";
+        tf = "task done";
+        td = "task delete";
         ts = "task sync";
         r = "report";
   	yuko-arch = "OPENAI_API_KEY=unused nix run nixpkgs#aider-chat -- --openai-api-base http://localhost:8081/v1 --model openai/architect --architect --edit-format editor-diff --no-stream --auto-commits";

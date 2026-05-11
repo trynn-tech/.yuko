@@ -21,7 +21,7 @@ in
       maplocalleader = " ";
       python3_host_prog = "${pyEnv}/bin/python3";
       
-      vimwiki_list = [{ path = "~/yang_wiki/"; syntax = "markdown"; ext = ".md"; }];
+      vimwiki_list = [{ path = "~/wiki_yuko/"; syntax = "markdown"; ext = ".md"; }];
       vimwiki_global_ext = 0;
       
       # THE BRAID: Pin to the exact same TW3 binary
@@ -66,7 +66,7 @@ in
 
     extraConfigVim = ''
       filetype plugin on
-      autocmd BufRead,BufNewFile ~/yang_wiki/*.md set filetype=vimwiki
+      autocmd BufRead,BufNewFile ~/wiki_yuko/*.md set filetype=vimwiki
 
       function! YangSync()
         if &ft != 'vimwiki' | return | endif
@@ -80,7 +80,7 @@ in
 
       augroup YangSyncGroup
         autocmd!
-        autocmd BufWritePost ~/yang_wiki/*.md call YangSync()
+        autocmd BufWritePost ~/wiki_yuko/*.md call YangSync()
       augroup END
 
       " POINT OF TRUTH: Direct path to the TW3 Nix store binary

@@ -1,4 +1,5 @@
-# modules/programs/firefox.nix
+# modules/programs/firefox/default.nix
+
 { config, pkgs, ... }:
 let
   # This makes the theme a proper Nix derivation
@@ -8,8 +9,18 @@ let
   };
 in
 {
+
+  #imports = [ ./tridactyl.nix ]; 
+
+  home.file.".surfingkeys.js".source = ./surfingkeys.js;
+
   programs.firefox = {
     enable = true;
+
+    # This links the manifest files so Firefox can "see" the bridge
+    #nativeMessagingHosts = [
+    #  pkgs.tridactyl-native
+    #];
     
     profiles.trynn = {
       id = 0;
@@ -17,6 +28,10 @@ in
       isDefault = true;
 
       settings = {
+
+	# --- Activate Extensions ---
+        "extensions.autoDisableScopes" = 0;
+        "extensions.enabledScopes" = 15;
 
         # ---  THE SECURITY CORE  ---
         "browser.contentblocking.category" = "strict";
@@ -84,8 +99,8 @@ in
         "privacy.trackingprotection.cryptomining.enabled" = true;
         "dom.battery.enabled" = false;
         "security.mixed_content.block_active_content" = true;
-        "privacy.fingerprintingProtection" = true; 
-        "privacy.fingerprintingProtection.pbmode" = true;
+        "privacy.fingerprintingProtection" = false; 
+        "privacy.fingerprintingProtection.pbmode" = false;
 
         # --- UI & Performance ---
         "browser.aboutConfig.showWarning" = false; # We are power users now
@@ -118,9 +133,10 @@ in
         ublock-origin
         adnauseam
         sponsorblock
-        surfingkeys
         auto-tab-discard
         darkreader
+	surfingkeys 
+	# tridactyl # Clunky safer surfingkeys
       ];
     };
   };
