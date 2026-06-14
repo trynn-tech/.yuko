@@ -16,18 +16,19 @@
     };
 
     nur.url = "github:nix-community/NUR";
+
+    # Add the upstream Hermes Agent flake
+    hermes-agent.url = "github:NousResearch/hermes-agent";
   };
 
-  outputs = { self, nixpkgs, home-manager, nixvim, nur, ... } @ inputs:
+  outputs = { self, nixpkgs, home-manager, nixvim, nur, hermes-agent, ... } @ inputs:
     let
       system = "x86_64-linux";
 
-      pkgs = import nixpkgs { 
-        inherit system; 
-        config.allowUnfree = true; # Required for many Firefox extensions
-        overlays = [ 
-          nur.overlays.default 
-        ];
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfree = true; 
+        overlays = [ nur.overlays.default ];
       };
 
       yukoEnv =
@@ -39,7 +40,7 @@
       mkYuko = { userName, homeDir }:
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
-          extraSpecialArgs = { inherit inputs; }; 
+          extraSpecialArgs = { inherit inputs; }; # Forward inputs down to profiles
 
           modules = [
             ./profiles/yuko-core.nix

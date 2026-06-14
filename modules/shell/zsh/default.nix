@@ -64,6 +64,7 @@ in
         ic = "${taskBin} add +inbox";
         ir = "${taskBin} +inbox list";
         vwi = "nvim ~/wiki_yuko/index.md";
+        vd = "nvim -c 'VimwikiMakeDiaryNote'";
         t = "task";
         te = "task edit";
         tu = "task modify";
@@ -178,7 +179,7 @@ in
     };
 
     home.packages = with pkgs; [ 
-        taskwarrior3 nh gnused tree git tig jq 
+        taskwarrior3 nh gnused tree git tig jq psmisc 
     ];
   };
 }

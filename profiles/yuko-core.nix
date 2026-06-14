@@ -72,8 +72,23 @@
     # Terminal Interface
     shell.default = true;
 
+    # -----------------------------------------------------------------
+    # Central Local AI Controller Endpoint Matrix
+    # -----------------------------------------------------------------
+    # Central Infrastructure Providers Matrix
+    composer.apiBase     = "http://localhost:8081/v1"; 
+    composer.searxngBase = "http://127.0.0.1:8888";
+    composer.modelName   = "architect";
+
+    # -----------------------------------------------------------------
+    # Toggle Consumer Interface Agents (They inherit the values above automatically)
+    # -----------------------------------------------------------------
+    # Artificial Intelligence Orchestrator and Interface
+    composer.hermes.enable = true;
     # Artificial Intelligence Pair Programmer
     composer.aider.enable = true;
+    # Artificial Intelligence Researcher
+    composer.deepResearch.enable = true;
 
     # This explicitly enables the Zsh configuration defined in the new submodule.
     # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
