@@ -1,1 +1,1 @@
-/nix/store/cxf0cjw2niahah2cnsa9yfxcay5n12n1-home-manager-files/.yuko/deep_research_workspace/hermes-orchestrator.py
+/nix/store/pxf5x11h36qskmlvqqn96cvn5m05zw76-home-manager-files/.yuko/deep_research_workspace/hermes-orchestrator.py

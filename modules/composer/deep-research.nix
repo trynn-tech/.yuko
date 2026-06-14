@@ -7,7 +7,6 @@ let
   yukoDir = "${config.home.homeDirectory}/.yuko";
   workspaceDir = "${yukoDir}/deep_research_workspace";
 
-  # Pinning Python to packages compatible with your target environment
   researchPython = pkgs.python3.withPackages (ps: [
     ps.requests
     ps.redis
@@ -39,14 +38,13 @@ in {
     };
 
     home.file.".local/bin/yuko-research".source = pkgs.writeShellScript "yuko-research" ''
-      # GEN-FINAL-ROCK-SOLID-v16
+      # GEN-FINAL-ROCK-SOLID-v18
       set -euo pipefail
       echo "[*] Initializing local research pipeline context..."
       export SYSTEM_PROMPT_OBJECTIVE="$*"
       export LITELLM_CLIENT_TIMEOUT="600"
       export OPENAI_API_TIMEOUT="600"
       
-      # FIXED: Swapped 'EOF' out for a unique delimiter to insulate internal python strings
       exec "${researchPython}/bin/python3" << '_YUKO_PY_MATRIX_'
 import os
 import sys
@@ -120,13 +118,10 @@ def call_local_llm(prompt, system_role, phase_key="live_stream"):
                 try:
                     chunk_json = json.loads(data_content)
                     delta = chunk_json["choices"][0]["delta"].get("content", "")
-                    
-                    # Track that the backend is actively talking to us, even if it sends space/newlines
                     if delta is not None:
                         full_content.append(delta)
                         received_chunks_count += 1
                                             
-                    # Stream pipeline telemetry back to Redis
                     if R and received_chunks_count % 5 == 0:
                         try:
                             current_text = "".join(full_content)
@@ -137,11 +132,8 @@ def call_local_llm(prompt, system_role, phase_key="live_stream"):
                     pass
                             
         final_output = "".join(full_content).strip()
-        
-        # FIXED: Only fail if we got absolutely zero functional chunks back from the engine
         if received_chunks_count == 0 or (not final_output and received_chunks_count < 3):
             return "Backend Pipeline Failure: Empty response payload received."
-            
         return final_output
             
     except Exception as e:
@@ -170,7 +162,6 @@ def run_matrix_loop():
     if not dense_context.strip():
         dense_context = "No auxiliary external context returned from search layer. Rely completely on interior base weights."
 
-    # Phase 1: Thesis Architecture Generation
     print("[*] Iteration 1/3: Structuring Project Workspace Blueprint [Thesis]...")
     structure_prompt = (
         f"Objective: {objective}\n"
@@ -188,7 +179,6 @@ def run_matrix_loop():
         print(f"[-] Critical failure during Thesis phase: {thesis}")
         sys.exit(1)
 
-    # Phase 2: Antithesis Deconstruction & Nix Optimization Layer
     print("[*] Iteration 2/3: Simulating Edge-Case Failures & Generating Nix Dependency Modules [Antithesis]...")
     dep_prompt = (
         f"Objective: {objective}\n"
@@ -208,7 +198,6 @@ def run_matrix_loop():
         antithesis = "Structural analysis cleared. Zero blocking compilation anomalies caught under strict validation bounds."
         if R: R.set("yuko_antithesis", antithesis)
 
-    # Phase 3: Synthesis Fusion Document
     print("[*] Iteration 3/3: Fusing Streams Into Final Hardened Design Profile [Synthesis]... ")
     synth_prompt = (
         f"OBJECTIVE:\n{objective}\n\n"
@@ -258,20 +247,24 @@ def run_matrix_loop():
     print(f"[+] Target technical specification written to: {spec_out}")
         
     print("[*] Passing context boundaries to Optimized yuko-compose Wrapper...")
+    
+    # Forcefully flatten environment maps locally inside the python process
+    flat_env = os.environ.copy()
+    flat_env["TERM"] = "dumb"
+    flat_env["PYTHONUNBUFFERED"] = "1"
+
+    # FIXED: Direct absolute path call prevents shell pathing or alias overrides from polluting the run
     subprocess.run([
-        "yuko-compose",
+        "/home/trynn/.local/bin/yuko-compose",
         "--stream",
         "--test-cmd", "python3 -m unittest discover -s . -p 'test_*.py' 2>/dev/null || nix flake check --impure 2>/dev/null || true",
         "--auto-test",
         "--message", (
-            "1. Read RESEARCH_SPEC.md thoroughly.\n"
-            "2. First, scaffold a corresponding unit test suite to validate operational boundaries.\n"
-            "3. Implement the primary functional source files completely without truncation.\n"
-            "4. Ensure all code blocks are fully fleshed out so the automated test command succeeds completely."
-            # FIXED: Removed literal "passes perfectly" token sequence to prevent string parser misinterpretations
+            "Read the system specification inside RESEARCH_SPEC.md. "
+            "Implement all requested code file modules completely without any truncation."
         ),
         "RESEARCH_SPEC.md"
-    ], cwd=CONFIG["workspace"], stdin=sys.stdin)
+    ], cwd=CONFIG["workspace"], env=flat_env, stdin=sys.stdin)
 
 if __name__ == "__main__":
     run_matrix_loop()
@@ -279,4 +272,3 @@ _YUKO_PY_MATRIX_
   '';
   };
 }
-

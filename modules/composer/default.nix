@@ -9,7 +9,6 @@ in {
     ./deep-research.nix
     ./hermes.nix
     ./ctags.nix
-    ./local-bin.nix
   ];
 
   options.yuko.composer = {
