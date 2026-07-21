@@ -61,17 +61,41 @@ in {
           "Mod4+Shift+9" = "move container to workspace 9";
           "Mod4+Shift+0" = "move container to workspace 10";
 
+          # Seamless physical screen shifting via keyboard shortcuts
+          "Mod4+Control+Left"  = "focus output left";
+          "Mod4+Control+Right" = "focus output right";
+          "Mod4+Control+Up"    = "focus output up";
+          "Mod4+Control+Down"  = "focus output down";
+
+          # Instantly push focused windows to the other monitor
+          "Mod4+Shift+Left"    = "move output left";
+          "Mod4+Shift+Right"   = "move output right";
+
           # Your Utilities
-	  ## Utilize Program launcher and open new pane in current Window 
-	  "Mod4+d" = "exec --no-startup-id i3-msg split h; exec ${pkgs.rofi}/bin/rofi -show drun";
-	  ## Open Yazi (File Manager) with win+y 
-	  "Mod4+e" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
-          "Mod4+minus" = "scratchpad show";
+          ## FIXED: Clean program launcher initialization to respect your targeted screen focus space
+          "Mod4+d" = "exec --no-startup-id ${pkgs.rofi}/bin/rofi -show drun";
+          ## Open Yazi (File Manager) with win+y 
+          "Mod4+e" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
           "Mod4+space" = "exec --no-startup-id i3-msg \"[class='scratchpad'] scratchpad show\" || exec alacritty --class scratchpad";
+          "Mod4+minus" = "scratchpad show";
           "Mod4+Shift+w" = "exec alacritty -e nvim +VimwikiIndex";
           "Mod4+Shift+q" = "kill";
           "Mod4+v" = "exec pavucontrol";
         };
+
+        # Explicitly map your workspace numbers to your verified physical port names
+        workspaceOutputAssign = [
+          { workspace = "1"; output = "HDMI-0"; }
+          { workspace = "2"; output = "HDMI-0"; }
+          { workspace = "3"; output = "HDMI-0"; }
+          { workspace = "4"; output = "HDMI-0"; }
+          { workspace = "5"; output = "HDMI-0"; }
+          { workspace = "6"; output = "HDMI-1-2"; } 
+          { workspace = "7"; output = "HDMI-1-2"; } 
+          { workspace = "8"; output = "HDMI-1-2"; } 
+          { workspace = "9"; output = "HDMI-1-2"; } 
+          { workspace = "10"; output = "HDMI-1-2"; } 
+        ];
 
         startup = [
           { command = "${pkgs.feh}/bin/feh --bg-max ${cfg.wallpaper}"; always = true; notification = false; }
@@ -88,17 +112,16 @@ in {
           {
             position = "bottom";
             statusCommand = "${pkgs.i3status}/bin/i3status";
-            # ... keep your existing bar colors/fonts here
           }
         ];
       };
 
-      # Prevents default windows dialog box
-             extraConfig = ''
-               new_window none
-               new_float none
-             '';
-
+      # Ensures display extension configuration boots before the layout engine establishes mapping positions
+      extraConfig = ''
+        exec_always --no-startup-id ${pkgs.xorg.xrandr}/bin/xrandr --output HDMI-0 --auto --primary --output HDMI-1-2 --auto --left-of HDMI-0
+        new_window none
+        new_float none
+      '';
     };
 
     home.file.".config/i3status/config".text = ''
@@ -128,13 +151,11 @@ in {
           format_degraded = "MEMORY LOW: %free"
       }
 
-      # Ethernet: Visible only when plugged in
       ethernet _first_ {
           format_up = "ETH: %ip"
           format_down = "" 
       }
 
-      # Wireless: Visible only when connected
       wireless _first_ {
           format_up = "WIFI: (%quality at %essid) %ip"
           format_down = ""
@@ -146,3 +167,4 @@ in {
     '';
   };
 }
+

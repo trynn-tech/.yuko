@@ -51,6 +51,7 @@
     pass
     isync
     msmtp
+    vlc
   ];
 
   # -------------------------------
@@ -93,7 +94,7 @@
     # This explicitly enables the Zsh configuration defined in the new submodule.
     # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
     # but you can also set it explicitly here:
-    #shell.zsh.enable = true;
+    shell.zsh.enable = true;
 
     # debug helper
     debug.manualSteps = true;

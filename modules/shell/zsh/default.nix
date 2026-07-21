@@ -60,6 +60,7 @@ in
         cy = "cd ${yukoFlake}";
         cs = "cd /etc/nixos";
         ym = "yuko_snowball";
+	ys = "sudo nixos-rebuild switch";
         task = "${taskBin}";
         ic = "${taskBin} add +inbox";
         ir = "${taskBin} +inbox list";
