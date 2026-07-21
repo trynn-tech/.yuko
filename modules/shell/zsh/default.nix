@@ -78,10 +78,36 @@ in
 
       initContent = ''
         export FLAKE="${yukoFlake}"
-        
+
         if [ -e "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
           . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
         fi
+
+        # --- SECURE CLIPBOARD UTILITIES ---
+
+        # Instant dual-backend clipboard destruction
+        ccl() {
+          if [ -n "$WAYLAND_DISPLAY" ]; then
+            ${pkgs.wl-clipboard}/bin/wl-copy --clear
+          else
+            ${pkgs.xclip}/bin/xclip -selection clipboard /dev/null
+            ${pkgs.xclip}/bin/xclip -selection primary /dev/null
+          fi
+          echo -e "\033[1;31m🧹 Clipboard securely wiped.\033[0m"
+        }
+
+        # Secure passcopy: copies an argument, then triggers an auto-wipe thread after 10 seconds
+        passcopy() {
+          if [ -n "$WAYLAND_DISPLAY" ]; then
+            echo -n "$1" | ${pkgs.wl-clipboard}/bin/wl-copy
+            (sleep 10 && ${pkgs.wl-clipboard}/bin/wl-copy --clear) &
+          else
+            echo -n "$1" | ${pkgs.xclip}/bin/xclip -selection clipboard -in
+            echo -n "$1" | ${pkgs.xclip}/bin/xclip -selection primary -in
+            (sleep 10 && ${pkgs.xclip}/bin/xclip -selection clipboard /dev/null && ${pkgs.xclip}/bin/xclip -selection primary /dev/null) &
+          fi
+          echo -e "\033[1;33m🔑 String copied securely. Auto-wiping in 10 seconds...\033[0m"
+        }
 
         # --- THE CORE ENGINES ---
 
@@ -174,13 +200,14 @@ in
         source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
         source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
         [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
-        
+
         compdef _task ${taskBin}
       '';
     };
 
-    home.packages = with pkgs; [ 
-        taskwarrior3 nh gnused tree git tig jq psmisc 
+    home.packages = with pkgs; [
+        taskwarrior3 nh gnused tree git tig jq psmisc wl-clipboard xclip
     ];
   };
 }
+

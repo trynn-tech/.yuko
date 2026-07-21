@@ -37,9 +37,9 @@ in
       number = true;
       relativenumber = true;
       termguicolors = true;
-      clipboard = "unnamedplus";
       undofile = true;
       conceallevel = 2;
+      # clipboard = "unnamedplus"; # REMOVED to prevent password/secret leakage to system clipboard
     };
 
     plugins = {
@@ -50,9 +50,6 @@ in
       lsp.enable = true;
       lsp.servers.nixd.enable = true;
     };
-    # If nixvim has a dedicated formatter interface, you *can*
-    # also hook conform/null-ls/etc here, but letting nixd format
-    # is usually simpler to start.
 
     extraPlugins = with pkgs.vimPlugins; [ vimwiki taskwiki vim-plugin-AnsiEsc ];
     extraPackages = with pkgs; [ wl-clipboard xclip taskwarrior3 ];
@@ -62,6 +59,10 @@ in
       vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Find Files" })
       vim.keymap.set("n", "<leader>ww", "<cmd>VimwikiIndex<CR>", { desc = "Wiki Index" })
       vim.keymap.set("n", "<leader>tw", ":call YangSync()<CR>", { desc = "Manual Task Sync" })
+
+      -- SECURE CLIPBOARD SYSTEM: Copy explicitly to the system clipboard on demand
+      vim.keymap.set("v", "<leader>y", '"+y', { desc = "Secure copy selection to system clipboard" })
+      vim.keymap.set("n", "<leader>Y", '"+yg_', { desc = "Secure copy line to system clipboard" })
     '';
 
     extraConfigVim = ''
@@ -83,8 +84,8 @@ in
         autocmd BufWritePost ~/wiki_yuko/*.md call YangSync()
       augroup END
 
-      " POINT OF TRUTH: Direct path to the TW3 Nix store binary
-      let g:taskwiki_taskbin = '/nix/store/2r0ryqw8ay9fs38rj38q3bfzv47drija-taskwarrior-3.4.2/bin/task'
+      " POINT OF TRUTH: Dynamically track the exact TW3 Nix store binary instead of static path
+      let g:taskwiki_taskbin = '${tw3Bin}'
       
       " DATA BRIDGE: Ensure we are using the SQLite database
       let g:taskwiki_data_location = '~/.local/share/task'
@@ -95,6 +96,4 @@ in
     '';
   };
 }
-
-
 
