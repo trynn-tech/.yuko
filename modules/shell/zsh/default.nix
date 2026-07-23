@@ -11,23 +11,47 @@ in
   options.yuko.shell.zsh.enable = lib.mkEnableOption "Zsh and Taskwarrior configuration";
 
   config = lib.mkIf config.yuko.shell.zsh.enable {
-
     home.sessionVariables = {
       EDITOR = "nvim";
       VISUAL = "nvim";
+      SSL_CERT_FILE = "/etc/ssl/certs/ca-bundle.crt";
     };
 
-    # Restoring zoxide (z)
     programs.zoxide = {
       enable = true;
       enableZshIntegration = true;
     };
 
-    # --- FZF Configuration ---
     programs.fzf = {
       enable = true;
       enableZshIntegration = true;
     };
+
+    # Automatically provision the dark-violets theme file for Taskwarrior
+    home.file.".config/task/dark-violets-256.theme".text = ''
+      # Taskwarrior Dark Violets 256 Theme
+      color.label=bold cyan
+      color.label.sort=cyan
+      color.alternate=on color235
+      color.header=bold yellow
+      color.footnote=yellow
+      color.warning=bold red
+      color.error=bold white on red
+      color.debug=cyan
+      color.summary.background=on color235
+      color.summary.bar=white on color141
+      color.active=bold white on color54
+      color.completed=color245
+      color.deleted=color240
+      color.recurring=magenta
+      color.scheduled=green
+      color.until=yellow
+      color.waiting=color248
+      color.priority.H=bold color141
+      color.priority.M=color103
+      color.priority.L=color60
+    '';
+
     programs.taskwarrior = {
       enable = true;
       package = pkgs.taskwarrior3;
@@ -42,25 +66,22 @@ in
         verbose=nothing
         report.inbox.filter=status:pending +inbox
         report.inbox.columns=id,entry.age,description
-        confirmation=no
-        confirmation=no
-	include dark-green-256.theme
-	color.tagged=cyan
+        include dark-violets-256.theme
+        color.tagged=cyan
       '';
     };
 
     programs.zsh = {
       enable = true;
       enableCompletion = true;
-
       shellAliases = {
-        ll = "ls -la"; la = "ls -lah"; l = "ls -lh"; # Describe directory elements
-        size = "du -hs"; ds = "du -hs"; # Print directory data volume
+        ll = "ls -la"; la = "ls -lah"; l = "ls -lh";
+        size = "du -hs"; ds = "du -hs";
         gs = "git status"; n = "nvim";
         cy = "cd ${yukoFlake}";
         cs = "cd /etc/nixos";
-        ym = "yuko_snowball";
-	ys = "sudo nixos-rebuild switch";
+        ym = "yuko_snowball";	
+        ys = "sudo nixos-rebuild switch";
         task = "${taskBin}";
         ic = "${taskBin} add +inbox";
         ir = "${taskBin} +inbox list";
@@ -72,20 +93,21 @@ in
         tf = "task done";
         td = "task delete";
         ts = "task sync";
-        r = "report";
-  	yuko-arch = "OPENAI_API_KEY=unused nix run nixpkgs#aider-chat -- --openai-api-base http://localhost:8081/v1 --model openai/architect --architect --edit-format editor-diff --no-stream --auto-commits";
+        r = "report";  	
+        yuko-arch = "OPENAI_API_KEY=unused nix run nixpkgs#aider-chat -- --openai-api-base http://localhost:8081/v1 --model openai/architect --architect --edit-format editor-diff --no-stream --auto-commits";
       };
-
       initContent = ''
-        export FLAKE="${yukoFlake}"
+        # --- AUTOSTART TMUX (Independent Sessions) ---
+        # Spawns a brand new unshared tmux session per terminal instance
+        if [[ -z "$TMUX" ]] && [[ -n "$PS1" ]] && [[ $- == *i* ]]; then
+          exec tmux
+        fi
 
+        export FLAKE="${yukoFlake}"
         if [ -e "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
           . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
         fi
 
-        # --- SECURE CLIPBOARD UTILITIES ---
-
-        # Instant dual-backend clipboard destruction
         ccl() {
           if [ -n "$WAYLAND_DISPLAY" ]; then
             ${pkgs.wl-clipboard}/bin/wl-copy --clear
@@ -96,7 +118,6 @@ in
           echo -e "\033[1;31m🧹 Clipboard securely wiped.\033[0m"
         }
 
-        # Secure passcopy: copies an argument, then triggers an auto-wipe thread after 10 seconds
         passcopy() {
           if [ -n "$WAYLAND_DISPLAY" ]; then
             echo -n "$1" | ${pkgs.wl-clipboard}/bin/wl-copy
@@ -109,14 +130,12 @@ in
           echo -e "\033[1;33m🔑 String copied securely. Auto-wiping in 10 seconds...\033[0m"
         }
 
-        # --- THE CORE ENGINES ---
-
         yuko_snowball() {
           cd "${yukoFlake}" || return 1
           echo "[yuko] formatting..."
           nix fmt . 2>/dev/null
-          echo "[yuko] activating configuration..."
-	  home-manager switch -b backup --flake .#yuko-core
+          echo "[yuko] activating configuration..."	  
+          home-manager switch -b backup --flake .#yuko-core
         }
 
         it() {
@@ -141,6 +160,87 @@ in
           done
         }
 
+        sort() {
+            local custom_filter="$1"
+            local phase=1                        
+            echo "🧬 Taskwarrior Resilient Queue Pipeline Active."
+            echo "--------------------------------------------------"
+            while true; do
+                local id=""
+                if [ -n "$custom_filter" ]; then
+                    id=$(${taskBin} status:pending "$custom_filter" -skipped _ids 2>/dev/null | head -n 1)
+                else
+                    if [ "$phase" -eq 1 ]; then
+                        id=$(${taskBin} status:pending +inbox priority: -skipped _ids 2>/dev/null | head -n 1)                                                
+                        if [ -z "$id" ]; then
+                            echo "🔄 Phase 1 exhausted. Shifting to Phase 2 (Refinement)..."
+                            phase=2
+                            sleep 1
+                            continue
+                        fi
+                    elif [ "$phase" -eq 2 ]; then
+                        id=$(${taskBin} status:pending +inbox -skipped _ids 2>/dev/null | head -n 1)                                                
+                        if [ -z "$id" ]; then
+                            echo "🎉 Inbox completely triaged! Shifting to general pending tasks..."
+                            phase=3
+                            sleep 1
+                            continue
+                        fi
+                    else
+                        id=$(${taskBin} status:pending -skipped _ids 2>/dev/null | head -n 1)                                                
+                        if [ -z "$id" ]; then
+                            echo "🎉 Queue empty or no matching tasks found. Exiting pipeline."
+                            break
+                        fi
+                    fi
+                fi
+                if [ -z "$id" ] && [ -n "$custom_filter" ]; then
+                    echo "🎉 Queue empty or no matching tasks found for filter: $custom_filter. Exiting pipeline."
+                    break
+                fi
+                clear
+                echo "=================================================="
+                ${taskBin} "$id" info
+                echo "=================================================="
+                echo -e "\n[Action Options]"
+                echo "  [p] Set/Change Priority (L, M, H, or blank)"
+                echo "  [j] Jump/Skip to next task"
+                echo "  [q] Quit pipeline"                                
+                echo -n "Select action [p/j/q]: "
+                read action
+                echo
+                case "$action" in
+                    p|P)
+                        echo -n "Enter priority (H/M/L or leave empty to clear): "
+                        read prio
+                        prio=$(echo "$prio" | tr '[:lower:]' '[:upper:]')
+                        if [[ "$prio" =~ ^[HML]$ ]]; then
+                            ${taskBin} "$id" modify priority:"$prio"
+                        elif [ -z "$prio" ]; then
+                            ${taskBin} "$id" modify priority:
+                        else
+                            echo "⚠️ Invalid priority. Skipping modification."
+                            sleep 1
+                            continue
+                        fi
+                        echo "✅ Task updated and advanced."
+                        ;;
+                    j|J)
+                        echo "⏭️ Skipping task..."
+                        ${taskBin} "$id" modify +skipped >/dev/null
+                        ;;
+                    q|Q)
+                        echo "🛑 Exiting queue pipeline."
+                        break
+                        ;;
+                    *)
+                        echo "⚠️ Unrecognized input. Advancing..."
+                        ;;
+                esac
+                sleep 0.5
+            done
+        }
+
         tlo() {
           clear
           echo -e "\033[1;35m=== DAILY RECAP ===\033[0m"
@@ -151,7 +251,6 @@ in
           ${taskBin} sync
         }
 
-        # The missing Report function for active tasks
         report() {
           echo -e "\033[1;35m--- [ PERFORMANCE REPORT ] ---\033[0m"
           local done=$(${taskBin} end:today status:completed count)
@@ -181,7 +280,6 @@ in
           report
         }
 
-        # ALIAS GENERATOR
         for entry in "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
           key="''${entry%%:*}"; name="''${entry#*:}"
           alias "''${key}c"="_proj $name c"
@@ -190,24 +288,20 @@ in
           alias "''${key}u"="_proj $name u"
           alias "''${key}d"="_proj $name d"
         done
-
         alias cx="${taskBin} context none && clear && echo -e '\033[1;32mContext Cleared\033[0m'"
         alias review='${taskBin} status:pending age.gt:2w list'
         alias tll='${taskBin} summary; echo -e "\n--- GAPS ---"; ${taskBin} gprojects'
 
-        # P10K and Plugins
         [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme
         source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
         source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
         [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
-
         compdef _task ${taskBin}
       '';
     };
 
     home.packages = with pkgs; [
-        taskwarrior3 nh gnused tree git tig jq psmisc wl-clipboard xclip
+      taskwarrior3 nh gnused tree git tig jq psmisc wl-clipboard xclip
     ];
   };
 }
-

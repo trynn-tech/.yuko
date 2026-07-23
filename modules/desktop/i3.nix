@@ -1,43 +1,67 @@
 # modules/desktop/i3.nix
-
 { config, lib, pkgs, ... }:
 
 with lib;
+
 let
   cfg = config.myDesktop;
+  arandrScript = ./assets/default.sh;
+  vlcStartupDir = "~/yt";
 in {
-
   options.myDesktop.wallpaper = mkOption {
     type = types.path;
     default = ./assets/default-bg.jpg;
   };
 
   config = {
-    # Ensure feh is available even if not in configuration.nix
-    home.packages = [ pkgs.feh ];
+    home.packages = [
+      pkgs.feh
+      pkgs.arandr
+      pkgs.vlc
+      pkgs.firefox
+      pkgs.kdePackages.kdeconnect-kde
+    ];
 
     xsession.windowManager.i3 = {
       enable = true;
       config = {
         modifier = "Mod4";
         terminal = "alacritty";
-
-        # Standard window behavior
         window = {
-          border = 0;
+          border = 2;
           titlebar = false;
         };
-
-        # Floating window behavior
         floating = {
-          border = 0;
+          border = 2;
           titlebar = false;
         };
 
-        # --------------
-        # Use lib.mkOptionDefault to ensure we only override what we need
+        # Neon Violet Accent Colors for Window Borders (Active orientation highlight)
+        colors = {
+          focused = {
+            border = "#bd00ff";
+            background = "#282a36";
+            text = "#ffffff";
+            indicator = "#bd00ff";
+            childBorder = "#bd00ff";
+          };
+          unfocused = {
+            border = "#444444";
+            background = "#222222";
+            text = "#888888";
+            indicator = "#222222";
+            childBorder = "#444444";
+          };
+          focusedInactive = {
+            border = "#666666";
+            background = "#222222";
+            text = "#ffffff";
+            indicator = "#666666";
+            childBorder = "#666666";
+          };
+        };
+
         keybindings = lib.mkOptionDefault {
-          # Use hardcoded Mod4 strings for maximum reliability
           "Mod4+1" = "workspace 1";
           "Mod4+2" = "workspace 2";
           "Mod4+3" = "workspace 3";
@@ -49,7 +73,6 @@ in {
           "Mod4+9" = "workspace 9";
           "Mod4+0" = "workspace 10";
 
-          # Container Moving
           "Mod4+Shift+1" = "move container to workspace 1";
           "Mod4+Shift+2" = "move container to workspace 2";
           "Mod4+Shift+3" = "move container to workspace 3";
@@ -61,29 +84,43 @@ in {
           "Mod4+Shift+9" = "move container to workspace 9";
           "Mod4+Shift+0" = "move container to workspace 10";
 
-          # Seamless physical screen shifting via keyboard shortcuts
           "Mod4+Control+Left"  = "focus output left";
           "Mod4+Control+Right" = "focus output right";
           "Mod4+Control+Up"    = "focus output up";
           "Mod4+Control+Down"  = "focus output down";
 
-          # Instantly push focused windows to the other monitor
           "Mod4+Shift+Left"    = "move output left";
           "Mod4+Shift+Right"   = "move output right";
 
-          # Your Utilities
-          ## FIXED: Clean program launcher initialization to respect your targeted screen focus space
+          # Vim-style focus keybindings
+          "Mod4+h" = "focus left";
+          "Mod4+j" = "focus down";
+          "Mod4+k" = "focus up";
+          "Mod4+l" = "focus right";
+
+          # Vim-style move keybindings
+          "Mod4+Shift+h" = "move left";
+          "Mod4+Shift+j" = "move down";
+          "Mod4+Shift+k" = "move up";
+          "Mod4+Shift+l" = "move right";
+
+          # Gamer Mode Toggle - pane focus indicator toggle
+          "Mod4+g" = "exec --no-startup-id i3-msg '[con_id=\"__focused__\"] border toggle'";
           "Mod4+d" = "exec --no-startup-id ${pkgs.rofi}/bin/rofi -show drun";
-          ## Open Yazi (File Manager) with win+y 
-          "Mod4+e" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
-          "Mod4+space" = "exec --no-startup-id i3-msg \"[class='scratchpad'] scratchpad show\" || exec alacritty --class scratchpad";
+          "Mod4+x" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
+          
+          "Mod4+Return" = "exec alacritty";
+          "Mod4+space" = "exec alacritty";
+
           "Mod4+minus" = "scratchpad show";
           "Mod4+Shift+w" = "exec alacritty -e nvim +VimwikiIndex";
           "Mod4+Shift+q" = "kill";
-          "Mod4+v" = "exec pavucontrol";
+          
+          "Mod4+b" = "exec pavucontrol";
+	  "Mod4+v" = "exec vlc --random ${vlcStartupDir}";
+          "Mod4+f" = "exec firefox";
         };
 
-        # Explicitly map your workspace numbers to your verified physical port names
         workspaceOutputAssign = [
           { workspace = "1"; output = "HDMI-0"; }
           { workspace = "2"; output = "HDMI-0"; }
@@ -97,7 +134,13 @@ in {
           { workspace = "10"; output = "HDMI-1-2"; } 
         ];
 
+        assigns = {
+          "1" = [ { class = "Firefox"; } ];
+          "5" = [ { class = "KDE Connect Indicator"; } ];
+        };
+
         startup = [
+          { command = "${arandrScript}"; notification = false; }
           { command = "${pkgs.feh}/bin/feh --bg-max ${cfg.wallpaper}"; always = true; notification = false; }
           { command = "xsetroot -cursor_name left_ptr"; always = true; notification = false; }
           { command = "${pkgs.copyq}/bin/copyq"; notification = false; }
@@ -106,6 +149,11 @@ in {
             always = true;
             notification = false;
           }
+          # 1. Start background terminal on workspace 2 first
+          { command = "i3-msg 'workspace 2; exec alacritty'"; notification = false; }
+          # 2. Start Firefox last and land focus cleanly on workspace 1
+          { command = "i3-msg 'workspace 1; exec firefox'"; notification = false; }
+          { command = "kdeconnect-indicator"; notification = false; }
         ];
 
         bars = [
@@ -116,11 +164,13 @@ in {
         ];
       };
 
-      # Ensures display extension configuration boots before the layout engine establishes mapping positions
       extraConfig = ''
-        exec_always --no-startup-id ${pkgs.xorg.xrandr}/bin/xrandr --output HDMI-0 --auto --primary --output HDMI-1-2 --auto --left-of HDMI-0
-        new_window none
-        new_float none
+        default_border pixel 2
+        default_floating_border pixel 2
+        hide_edge_borders smart
+        
+        # Automatically make Firefox fullscreen on workspace 1
+        for_window [workspace="1" class="Firefox"] fullscreen enable
       '';
     };
 
@@ -139,32 +189,26 @@ in {
       order += "ethernet _first_"
       order += "wireless _first_"
       order += "tztime local"
-
       read_file gpu_vram {
           path = "/tmp/gpu_vram"
           format = "GPU VRAM: %content MB"
       }
-
       memory {
           format = "RAM: %used / %total"
           threshold_degraded = "10%"
           format_degraded = "MEMORY LOW: %free"
       }
-
       ethernet _first_ {
           format_up = "ETH: %ip"
           format_down = "" 
       }
-
       wireless _first_ {
           format_up = "WIFI: (%quality at %essid) %ip"
           format_down = ""
       }
-
       tztime local {
           format = "%Y-%m-%d %H:%M:%S"
       }
     '';
   };
 }
-

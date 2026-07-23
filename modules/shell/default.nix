@@ -9,7 +9,6 @@ in
   imports = [
     ./zsh
     ./ledger.nix
-    # ./tmux (Add this here if you move tmux out of root later)
   ];
 
   options.yuko.shell.default = lib.mkOption {

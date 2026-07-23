@@ -52,6 +52,7 @@
     isync
     msmtp
     vlc
+    flashfocus
   ];
 
   # -------------------------------

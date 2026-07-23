@@ -1,15 +1,17 @@
 # modules/tmux/default.nix
+{ config, lib, pkgs, ... }: {
+  # Explicitly symlink ~/.tmux.conf to Home Manager's generated configuration path
+  home.file.".tmux.conf".source = config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.config/tmux/tmux.conf";
 
-{config, lib, pkgs, ...}: {
   programs.tmux = {
     enable = true;
     shell = "${pkgs.zsh}/bin/zsh";
-    terminal = "screen-256color";
+    # Upgrade terminal to xterm-256color to fully support advanced color definitions
+    terminal = "xterm-256color";
     mouse = true;
     keyMode = "vi";
     historyLimit = 100000;
     clock24 = true;
-
     extraConfig = ''
       # Force Tmux to use vi keys natively in copy mode
       setw -g mode-keys vi
@@ -22,34 +24,49 @@
       bind | split-window -h
       bind - split-window -v
 
-      # Reload config
-      bind r source-file ~/.tmux.conf \; display-message "tmux config reloaded"
+      # Reload config with visual debug output
+      bind r source-file ~/.tmux.conf \; display-message "🔥 YUKO TMUX CONFIG RELOADED SUCCESSFULLY! 🔥"
+
+      # =====================================================================
+      # THEME & STATUS BAR STYLING (Neon Violet, Mellow Teal, Emerald)
+      # =====================================================================
+      set-option -g status-style "bg=default,fg=white"
+
+      # Window list styling
+      set-window-option -g window-status-style "fg=cyan,bg=default"
+      set-window-option -g window-status-current-style "fg=magenta,bg=default,bold"
+      set-window-option -g window-status-format " #I:#W "
+      set-window-option -g window-status-current-format " [#I:#W] "
+
+      # Status right styling with explicit hex/color attributes
+      # Neon Violet (#af87ff / colour141) for Active, Mellow Teal (#5fafaf / colour73) separators, and Emerald (#00af87 / colour36) for Inbox
+      set-option -g status-right-length 120
+      set-option -g status-right "#[fg=#af87ff,bold]Active: #(task +ACTIVE status:pending count 2>/dev/null || echo '0') #[fg=#5fafaf]|#[default] #[fg=#00af87,bold]Inbox: #(task +inbox status:pending count 2>/dev/null || echo '0') "
+
+      # =====================================================================
+      # ERGONOMIC BINDINGS FOR COPY MODE & PROMPT JUMPING
+      # =====================================================================
+      bind-key -n M-Space copy-mode
 
       # =====================================================================
       # MOUSE HOVER SELECTION & AUTOMATIC COPY
       # =====================================================================
-      
-      # Clicking and dragging text automatically starts selection highlights.
-      # Releasing the mouse button will immediately copy the highlighted text
-      # to your secure pipeline and exit copy mode seamlessly.
       bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "sh -c '${pkgs.wl-clipboard}/bin/wl-copy 2>/dev/null || ${pkgs.xclip}/bin/xclip -selection clipboard -in'"
-
-      # Note: To bypass Tmux completely and use your terminal's default copy behavior,
-      # simply hold down the SHIFT key while selecting text with your mouse.
 
       # =====================================================================
       # VIM-STYLE KEYBOARD COPY MODE BINDINGS
       # =====================================================================
-      # Unbind default keys first to prevent conflicts
       unbind-key -T copy-mode-vi v
       unbind-key -T copy-mode-vi y
 
       # Bind v to begin selection (highlighting)
       bind-key -T copy-mode-vi v send-keys -X begin-selection
 
-      # Bind y to copy using your secure local system tools with explicit shell evaluation
+      # Bind y to copy using secure local system tools
       bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "sh -c '${pkgs.wl-clipboard}/bin/wl-copy 2>/dev/null || ${pkgs.xclip}/bin/xclip -selection clipboard -in'"
+
+      # Use Ctrl + j inside copy-mode to instantly jump backward to your prompt signature (❯ )
+      bind-key -T copy-mode-vi C-j send-keys -X search-backward "❯ "
     '';
   };
 }
-
