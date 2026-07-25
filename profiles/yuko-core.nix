@@ -52,7 +52,7 @@
     isync
     msmtp
     vlc
-    flashfocus
+    strawberry
   ];
 
   # -------------------------------

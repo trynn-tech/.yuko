@@ -108,17 +108,19 @@ in {
           "Mod4+g" = "exec --no-startup-id i3-msg '[con_id=\"__focused__\"] border toggle'";
           "Mod4+d" = "exec --no-startup-id ${pkgs.rofi}/bin/rofi -show drun";
           "Mod4+x" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
-          
+
           "Mod4+Return" = "exec alacritty";
           "Mod4+space" = "exec alacritty";
-
           "Mod4+minus" = "scratchpad show";
           "Mod4+Shift+w" = "exec alacritty -e nvim +VimwikiIndex";
           "Mod4+Shift+q" = "kill";
-          
+
           "Mod4+b" = "exec pavucontrol";
-	  "Mod4+v" = "exec vlc --random ${vlcStartupDir}";
+          "Mod4+v" = "exec vlc --random ${vlcStartupDir}";
           "Mod4+f" = "exec firefox";
+
+          # Instantly reload arandr layout/tv setup hotkey
+          "Mod4+F12" = "exec --no-startup-id ${arandrScript}";
         };
 
         workspaceOutputAssign = [
@@ -127,11 +129,11 @@ in {
           { workspace = "3"; output = "HDMI-0"; }
           { workspace = "4"; output = "HDMI-0"; }
           { workspace = "5"; output = "HDMI-0"; }
-          { workspace = "6"; output = "HDMI-1-2"; } 
-          { workspace = "7"; output = "HDMI-1-2"; } 
-          { workspace = "8"; output = "HDMI-1-2"; } 
-          { workspace = "9"; output = "HDMI-1-2"; } 
-          { workspace = "10"; output = "HDMI-1-2"; } 
+          { workspace = "6"; output = "HDMI-1-2"; }
+          { workspace = "7"; output = "HDMI-1-2"; }
+          { workspace = "8"; output = "HDMI-1-2"; }
+          { workspace = "9"; output = "HDMI-1-2"; }
+          { workspace = "10"; output = "HDMI-1-2"; }
         ];
 
         assigns = {
@@ -168,7 +170,7 @@ in {
         default_border pixel 2
         default_floating_border pixel 2
         hide_edge_borders smart
-        
+
         # Automatically make Firefox fullscreen on workspace 1
         for_window [workspace="1" class="Firefox"] fullscreen enable
       '';
@@ -182,6 +184,7 @@ in {
           color_degraded = "#e0af68"
           color_bad = "#f7768e"
       }
+
       order += "disk /"
       order += "load"
       order += "memory"
@@ -189,23 +192,28 @@ in {
       order += "ethernet _first_"
       order += "wireless _first_"
       order += "tztime local"
+
       read_file gpu_vram {
           path = "/tmp/gpu_vram"
           format = "GPU VRAM: %content MB"
       }
+
       memory {
           format = "RAM: %used / %total"
           threshold_degraded = "10%"
           format_degraded = "MEMORY LOW: %free"
       }
+
       ethernet _first_ {
           format_up = "ETH: %ip"
-          format_down = "" 
+          format_down = ""
       }
+
       wireless _first_ {
           format_up = "WIFI: (%quality at %essid) %ip"
           format_down = ""
       }
+
       tztime local {
           format = "%Y-%m-%d %H:%M:%S"
       }

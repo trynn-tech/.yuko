@@ -39,14 +39,15 @@
       set-window-option -g window-status-current-format " [#I:#W] "
 
       # Status right styling with explicit hex/color attributes
-      # Neon Violet (#af87ff / colour141) for Active, Mellow Teal (#5fafaf / colour73) separators, and Emerald (#00af87 / colour36) for Inbox
-      set-option -g status-right-length 120
-      set-option -g status-right "#[fg=#af87ff,bold]Active: #(task +ACTIVE status:pending count 2>/dev/null || echo '0') #[fg=#5fafaf]|#[default] #[fg=#00af87,bold]Inbox: #(task +inbox status:pending count 2>/dev/null || echo '0') "
+      # Active (Neon Violet #af87ff), Inbox (Emerald #00af87), Separators (Mellow Teal #5fafaf)
+      # Unsorted: Calm Cobalt (#5f87d7) if 1-7, Calm Coral (#d78787) if >7, hidden if 0
+      set-option -g status-right-length 150
+      set-option -g status-right "#[fg=#af87ff,bold]Active: #(task +ACTIVE status:pending count 2>/dev/null || echo '0') #[fg=#5fafaf]|#[default] #[fg=#00af87,bold]Inbox: #(task +inbox status:pending count 2>/dev/null || echo '0')#(task +inbox priority: status:pending count 2>/dev/null | awk '\$1 > 7 {print \" #[fg=#5fafaf]|#[default] #[fg=#d78787,bold]Unsorted: \" \$1} \$1 > 0 && \$1 <= 7 {print \" #[fg=#5fafaf]|#[default] #[fg=#5f87d7,bold]Unsorted: \" \$1}') "
 
       # =====================================================================
       # ERGONOMIC BINDINGS FOR COPY MODE & PROMPT JUMPING
       # =====================================================================
-      bind-key -n M-Space copy-mode
+      bind-key -n C-j copy-mode
 
       # =====================================================================
       # MOUSE HOVER SELECTION & AUTOMATIC COPY
@@ -66,7 +67,7 @@
       bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "sh -c '${pkgs.wl-clipboard}/bin/wl-copy 2>/dev/null || ${pkgs.xclip}/bin/xclip -selection clipboard -in'"
 
       # Use Ctrl + j inside copy-mode to instantly jump backward to your prompt signature (❯ )
-      bind-key -T copy-mode-vi C-j send-keys -X search-backward "❯ "
+      bind-key -T copy-mode-vi C-k send-keys -X search-backward "❯ "
     '';
   };
 }

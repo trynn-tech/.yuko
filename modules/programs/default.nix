@@ -5,6 +5,7 @@
   imports = [
     ./firefox
     ./file-managers.nix
+    ./mpv.nix
   ];
 }
 

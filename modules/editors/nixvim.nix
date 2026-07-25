@@ -1,6 +1,5 @@
 # modules/editors/nixvim.nix
 { config, pkgs, ... }:
-
 let
   pyEnv = pkgs.python3.withPackages (ps: with ps; [ 
     pynvim tasklib six packaging 
@@ -10,12 +9,10 @@ in
 {
   programs.nixvim = {
     enable = true;
-
     python3Provider = {
       enable = true;
       package = pyEnv;
     };
-
     globals = {
       mapleader = " ";
       maplocalleader = " ";
@@ -32,7 +29,6 @@ in
       # Stop automatic re-creation loops
       taskwiki_disable_automatic_events = [ "InsertLeave" "TextChanged" "TextChangedI" "BufWinEnter" ];
     };
-
     opts = {
       number = true;
       relativenumber = true;
@@ -41,7 +37,6 @@ in
       conceallevel = 2;
       # clipboard = "unnamedplus"; # REMOVED to prevent password/secret leakage to system clipboard
     };
-
     plugins = {
       treesitter.enable = true;
       web-devicons.enable = true;
@@ -50,9 +45,10 @@ in
       lsp.enable = true;
       lsp.servers.nixd.enable = true;
     };
-
     extraPlugins = with pkgs.vimPlugins; [ vimwiki taskwiki vim-plugin-AnsiEsc ];
-    extraPackages = with pkgs; [ wl-clipboard xclip taskwarrior3 ];
+    
+    # Added jq here so the auto-formatting filter has access to it
+    extraPackages = with pkgs; [ wl-clipboard xclip taskwarrior3 jq ];
 
     extraConfigLua = ''
       local builtin = require('telescope.builtin')
@@ -68,7 +64,7 @@ in
     extraConfigVim = ''
       filetype plugin on
       autocmd BufRead,BufNewFile ~/wiki_yuko/*.md set filetype=vimwiki
-
+      
       function! YangSync()
         if &ft != 'vimwiki' | return | endif
         let l:save = winsaveview()
@@ -84,7 +80,25 @@ in
         autocmd BufWritePost ~/wiki_yuko/*.md call YangSync()
       augroup END
 
-      " POINT OF TRUTH: Dynamically track the exact TW3 Nix store binary instead of static path
+      " PREPROCESSING & FORMATTING: Fault-tolerant JSON/Task array formatting
+      augroup PrettyPrintJsonWorkflows
+        autocmd!
+        autocmd BufReadPost,BufNewFile */wiki_yuko/*,*/inbox_yuko/*,*/wiki_yuko/*.md,*/inbox_yuko/*.md
+            \ let l:is_json_array = (getline(1) =~ '^\s*\[') |
+            \ if l:is_json_array || &filetype ==# 'json' |
+            \   let l:test_cmd = "system('jq .', join(getline(1, '$'), \"\n\"))" |
+            \   if v:shell_error != 0 |
+            \     echohl WarningMsg |
+            \     echo "JQ Parse Error: File contains invalid JSON. Bypassing auto-formatter." |
+            \     echohl None |
+            \   else |
+            \     execute "%!jq '.'" |
+            \     if l:is_json_array | setlocal filetype=json | endif |
+            \   endif |
+            \ endif
+      augroup END
+
+     " POINT OF TRUTH: Dynamically track the exact TW3 Nix store binary instead of static path
       let g:taskwiki_taskbin = '${tw3Bin}'
       
       " DATA BRIDGE: Ensure we are using the SQLite database
@@ -94,6 +108,5 @@ in
       let g:taskwiki_dont_preserve_environment = 1
       let g:taskwiki_disable_prompts = 1
     '';
-  };
+    };
 }
-
