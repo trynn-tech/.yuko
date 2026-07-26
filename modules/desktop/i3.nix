@@ -116,7 +116,6 @@ in {
           "Mod4+Shift+q" = "kill";
 
           "Mod4+b" = "exec pavucontrol";
-          "Mod4+v" = "exec vlc --random ${vlcStartupDir}";
           "Mod4+f" = "exec firefox";
 
           # Instantly reload arandr layout/tv setup hotkey

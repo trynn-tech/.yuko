@@ -26,12 +26,6 @@
 
     # Program modules
     ../modules/programs
-
-    # Mail modules
-    ../modules/mail/accounts/trynn-primary.nix
-    ../modules/mail/neomutt.nix
-    ../modules/mail/mbsync.nix
-    ../modules/mail/msmtp.nix
   ];
 
   # Profile-specific extras live here if needed
@@ -49,8 +43,6 @@
     fd
     fzf
     pass
-    isync
-    msmtp
     vlc
     strawberry
   ];
@@ -82,42 +74,14 @@
     composer.searxngBase = "http://127.0.0.1:8888";
     composer.modelName   = "architect";
 
-    # -----------------------------------------------------------------
-    # Toggle Consumer Interface Agents (They inherit the values above automatically)
-    # -----------------------------------------------------------------
-    # Artificial Intelligence Orchestrator and Interface
-    composer.hermes.enable = true;
     # Artificial Intelligence Pair Programmer
     composer.aider.enable = true;
-    # Artificial Intelligence Researcher
+
+    # Artificial Architect
     composer.deepResearch.enable = true;
 
     # This explicitly enables the Zsh configuration defined in the new submodule.
-    # Note: I added a line in modules/shell/default.nix to set this based on shell.default,
-    # but you can also set it explicitly here:
     shell.zsh.enable = true;
 
-    # debug helper
-    debug.manualSteps = true;
-
-    # Allow mail or mbsync/IMAP to create directories
-    security.mailLockdown = false;
-
-    # A Bit archaic and not very useful for Nix,
-    #first thought for semantics and may remove
-    composer.ctags.enable = true;
-
   };
-
-  # -------------------------------
-  # Custom Semantic Compiler
-  # -------------------------------
-  yuko.composer.ctags.extraConfig = ''
-    # Treat *.nix as Nix (if needed)
-    --langmap=Nix:.nix
-
-    # Later: USL / Forge / yuko.* patterns here
-    # Adjunct definition of code here ...
-  '';
-
 }

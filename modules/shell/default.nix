@@ -2,7 +2,6 @@
 { config, lib, pkgs, ... }:
 
 let
-  inherit (config.yuko.debug) logStep;
   cfg = config.yuko.shell;
 in
 {
@@ -38,9 +37,9 @@ in
           if [ "$SHELL" != "$TARGET_SHELL" ]; then
             echo "Home Manager: updating login shell to $TARGET_SHELL"
             if $CHSH -s "$TARGET_SHELL"; then
-              ${logStep { component = "shell"; message = "Login shell updated to Nix zsh."; }}
+              echo "Login shell updated to Nix zsh."
             else
-              ${logStep { component = "shell"; message = "Login shell update failed."; }}
+              echo "Login shell update failed."
             fi
           fi
         )

@@ -71,6 +71,8 @@ in
       ir = "task +inbox rc.report.next.sort=urgency+ limit:0 next";
       t = "task";
       te = "task edit";
+      tb = "task start";
+      th = "task stop";
       tu = "task append";
       tf = "task done";
       td = "task delete";
@@ -104,48 +106,69 @@ in
       }
 
       sort() {
-        local taskBin="''${TASKWARIOR_BIN:-task}"
-        local -a skipped_ids=()
-        while true; do
-          local id=""
-          local -a exclude_args=()
-          for skip_id in ''${skipped_ids[@]}; do
-            exclude_args+=( "id.not:''${skip_id}" )
-          done
-          id="''$( ''${taskBin} +inbox +READY sort:priority- ''${exclude_args[@]} _ids 2>/dev/null | head -n 1 )"
-          id="''${id//[[:space:]]/}"
-          clear
-          echo -e "\033[1;33m==== CONTROLLER ARRAY DIAGNOSTICS ====\033[0m"
-          echo "Skipped IDs List Array Count  : ''${#skipped_ids[@]}"
-          echo "Skipped IDs Array Elements     : ''${skipped_ids[@]}"
-          echo "Generated Individual Tokens    : ''${exclude_args[@]}"
-          echo -e "\033[1;33m======================================\033[0m\n"
-          if [[ -z "''${id}" ]]; then
-            echo -e "\033[1;32m✅ Inbox triage complete for this session!\033[0m"
-            break
-          fi
-          echo -e "\033[1;35m--- Next Inbox Item: ''${id} ---\033[0m"
-          ''${taskBin} "''${id}" info
-          echo -e "\n\033[1;36mPRIORITY:\033[0m [H] High | [M] Medium | [L] Low | [Enter] Advance/Skip | [Q] Quit"
-          echo -n "🚀 Select option (h/m/l/Enter/q): "
-          local input=""
-          read -r input < /dev/tty
-          local action="''${input:u}"
-          if [[ "''${action}" == "Q" ]]; then
-            break
-          fi
-          case "''${action}" in
-            H|M|L)
-              ''${taskBin} "''${id}" modify priority:"''${action}" >/dev/null 2>&1
-              skipped_ids+=( "''${id}" )
-              ;;
-            *)
-              skipped_ids+=( "''${id}" )
-              ;;
-          esac
-          sleep 0.1
-        done
-      }
+              local taskBin="''${TASKWARIOR_BIN:-task}"
+              local target_project="''${1:-}"
+              local -a filter_args=()
+      
+              if [[ -n "''${target_project}" ]]; then
+                filter_args=( "project:''${target_project}" "+READY" )
+              else
+                filter_args=( "+inbox" "+READY" )
+              fi
+      
+              local -a skipped_ids=()
+              while true; do
+                local id=""
+                local -a exclude_args=()
+                for skip_id in ''${skipped_ids[@]}; do
+                  exclude_args+=( "id.not:''${skip_id}" )
+                done
+      
+                id="$( ''${taskBin} ''${filter_args[@]} sort:priority- ''${exclude_args[@]} _ids 2>/dev/null | head -n 1 )"
+                id="''${id//[[:space:]]/}"
+      
+                clear
+                echo -e "\033[1;33m==== CONTROLLER ARRAY DIAGNOSTICS ====\033[0m"
+                echo "Target Filter                   : ''${target_project:-inbox}"
+                echo "Skipped IDs List Array Count  : ''${#skipped_ids[@]}"
+                echo "Skipped IDs Array Elements     : ''${skipped_ids[@]}"
+                echo "Generated Individual Tokens    : ''${exclude_args[@]}"
+                echo -e "\033[1;33m======================================\033[0m\n"
+      
+                if [[ -z "''${id}" ]]; then
+                  if [[ -n "''${target_project}" ]]; then
+                    echo -e "\033[1;32m✅ Triage complete for project: ''${target_project}!\033[0m"
+                  else
+                    echo -e "\033[1;32m✅ Inbox triage complete for this session!\033[0m"
+                  fi
+                  break
+                fi
+      
+                echo -e "\033[1;35m--- Next Item: ''${id} ---\033[0m"
+                ''${taskBin} "''${id}" info
+                echo -e "\n\033[1;36mPRIORITY:\033[0m [H] High | [M] Medium | [L] Low | [Enter] Advance/Skip | [Q] Quit"
+                echo -n "🚀 Select option (h/m/l/Enter/q): "
+      
+                local input=""
+                read -r input < /dev/tty
+                local action="''${input:u}"
+      
+                if [[ "''${action}" == "Q" ]]; then
+                  break
+                fi
+      
+                case "''${action}" in
+                  H|M|L)
+                    ''${taskBin} "''${id}" modify priority:"''${action}" >/dev/null 2>&1
+                    skipped_ids+=( "''${id}" )
+                    ;;
+                  *)
+                    skipped_ids+=( "''${id}" )
+                    ;;
+                esac
+                sleep 0.1
+              done
+            }
 
       tlo() {
         clear

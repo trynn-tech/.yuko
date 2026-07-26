@@ -1,4 +1,0 @@
-CRITICAL MISSION: Open and fully read the file 'RESEARCH_SPEC.md' inside your workspace directory. Write a modular, hardened Python 3 architecture containing two core modules:
-1. `redis_connection.py` -> Handles native TCP socket initialization on port 6379 using python-redis interface.
-2. `redis_info_parser.py` -> Calls standard INFO commands, extracts used_memory and total_system_memory safely, and returns them as a verified structured JSON data dictionary.
-Implement clean error mitigation for missing metrics. Verify code completeness and do not truncate snippets. Execute tests using the terminal tool to confirm the outputs match the specification perfectly.

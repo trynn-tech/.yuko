@@ -8,7 +8,6 @@ in {
     ./aider.nix
     ./deep-research.nix
     ./hermes.nix
-    ./ctags.nix
   ];
 
   options.yuko.composer = {
@@ -33,4 +32,3 @@ in {
     };
   };
 }
-
