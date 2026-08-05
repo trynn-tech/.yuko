@@ -6,7 +6,6 @@
     mpv
     socat
     findutils
-    fzf
   ];
 
   # Native mpv window keybindings

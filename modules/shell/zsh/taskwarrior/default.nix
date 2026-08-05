@@ -4,10 +4,61 @@
 let
   taskBin = "${pkgs.taskwarrior3}/bin/task";
 
+  taskCarouselScript = pkgs.writeText "task-carousel.py" ''
+    #!/usr/bin/env python3
+    import sys
+    import json
+    import random
+    import subprocess
+    from datetime import datetime
+
+    PROJECTS_CONFIG = {
+        "technical": 5,
+        "system": 4,
+        "yuko": 4,
+        "life": 3,
+        "radiant": 2,
+        "re-l": 2,
+    }
+
+    def run_cmd(args):
+        result = subprocess.run(["task", "rc.confirmation=no"] + args, capture_output=True, text=True)
+        return result.stdout.strip()
+
+    def main():
+        today_str = datetime.now().strftime("%Y-%m-%d")
+
+        status = run_cmd(["rc.verbose=nothing", "rc.hooks=off", "+carousel_tracker", "export"])
+
+        if status:
+            try:
+                tasks = json.loads(status)
+                if tasks:
+                    task_list = tasks if isinstance(tasks, list) else [tasks]
+                    for tracker in task_list:
+                        if tracker.get("description") == f"Carousel Ran: {today_str}":
+                            sys.exit(0)
+                        else:
+                            run_cmd(["rc.hooks=off", str(tracker["uuid"]), "delete"])
+            except Exception:
+                pass
+
+        project_names = list(PROJECTS_CONFIG.keys())
+        project_weights = list(PROJECTS_CONFIG.values())
+        selected_project = random.choices(project_names, weights=project_weights, k=1)[0]
+
+        run_cmd(["rc.hooks=off", "add", f"=^-.-^= Neural Ordinance: {selected_project} project", "due:today", "+inbox", f"project:{selected_project}"])
+        run_cmd(["rc.hooks=off", "add", f"Carousel Ran: {today_str}", "+carousel_tracker", "status:completed"])
+
+    if __name__ == "__main__":
+        main()
+  '';
+
   taskCarousel = pkgs.writers.writePython3Bin "task-carousel" {
-    libraries = [ ];
+    libraries = [];
     doCheck = false;
-  } (builtins.readFile ./carousel.py);
+  } (builtins.readFile taskCarouselScript);
+
 in
 {
   options.yuko.shell.taskwarrior.enable = lib.mkEnableOption "Taskwarrior shell integration and tooling";
@@ -59,7 +110,8 @@ in
         report.inbox.columns=id,entry.age,description
         report.inbox.sort=urgency-
         include dark-violets-256.theme
-        color.tagged=cyan
+        color.tagged=color213
+        rule.precedence.color=deleted,completed,active,keyword.,tag.,project.,overdue,scheduled,due.today,due,blocked,blocking,recurring,uda.,tagged
       '';
     };
 
@@ -106,69 +158,69 @@ in
       }
 
       sort() {
-              local taskBin="''${TASKWARIOR_BIN:-task}"
-              local target_project="''${1:-}"
-              local -a filter_args=()
-      
-              if [[ -n "''${target_project}" ]]; then
-                filter_args=( "project:''${target_project}" "+READY" )
-              else
-                filter_args=( "+inbox" "+READY" )
-              fi
-      
-              local -a skipped_ids=()
-              while true; do
-                local id=""
-                local -a exclude_args=()
-                for skip_id in ''${skipped_ids[@]}; do
-                  exclude_args+=( "id.not:''${skip_id}" )
-                done
-      
-                id="$( ''${taskBin} ''${filter_args[@]} sort:priority- ''${exclude_args[@]} _ids 2>/dev/null | head -n 1 )"
-                id="''${id//[[:space:]]/}"
-      
-                clear
-                echo -e "\033[1;33m==== CONTROLLER ARRAY DIAGNOSTICS ====\033[0m"
-                echo "Target Filter                   : ''${target_project:-inbox}"
-                echo "Skipped IDs List Array Count  : ''${#skipped_ids[@]}"
-                echo "Skipped IDs Array Elements     : ''${skipped_ids[@]}"
-                echo "Generated Individual Tokens    : ''${exclude_args[@]}"
-                echo -e "\033[1;33m======================================\033[0m\n"
-      
-                if [[ -z "''${id}" ]]; then
-                  if [[ -n "''${target_project}" ]]; then
-                    echo -e "\033[1;32m✅ Triage complete for project: ''${target_project}!\033[0m"
-                  else
-                    echo -e "\033[1;32m✅ Inbox triage complete for this session!\033[0m"
-                  fi
-                  break
-                fi
-      
-                echo -e "\033[1;35m--- Next Item: ''${id} ---\033[0m"
-                ''${taskBin} "''${id}" info
-                echo -e "\n\033[1;36mPRIORITY:\033[0m [H] High | [M] Medium | [L] Low | [Enter] Advance/Skip | [Q] Quit"
-                echo -n "🚀 Select option (h/m/l/Enter/q): "
-      
-                local input=""
-                read -r input < /dev/tty
-                local action="''${input:u}"
-      
-                if [[ "''${action}" == "Q" ]]; then
-                  break
-                fi
-      
-                case "''${action}" in
-                  H|M|L)
-                    ''${taskBin} "''${id}" modify priority:"''${action}" >/dev/null 2>&1
-                    skipped_ids+=( "''${id}" )
-                    ;;
-                  *)
-                    skipped_ids+=( "''${id}" )
-                    ;;
-                esac
-                sleep 0.1
-              done
-            }
+        local taskBin="''${TASKWARIOR_BIN:-task}"
+        local target_project="''${1:-}"
+        local -a filter_args=()
+
+        if [[ -n "''${target_project}" ]]; then
+          filter_args=( "project:''${target_project}" "+READY" )
+        else
+          filter_args=( "+inbox" "+READY" )
+        fi
+
+        local -a skipped_ids=()
+        while true; do
+          local id=""
+          local -a exclude_args=()
+          for skip_id in ''${skipped_ids[@]}; do
+            exclude_args+=( "id.not:''${skip_id}" )
+          done
+
+          id="$( ''${taskBin} ''${filter_args[@]} sort:priority- ''${exclude_args[@]} _ids 2>/dev/null | head -n 1 )"
+          id="''${id//[[:space:]]/}"
+
+          clear
+          echo -e "\033[1;33m==== CONTROLLER ARRAY DIAGNOSTICS ====\033[0m"
+          echo "Target Filter                   : ''${target_project:-inbox}"
+          echo "Skipped IDs List Array Count  : ''${#skipped_ids[@]}"
+          echo "Skipped IDs Array Elements     : ''${skipped_ids[@]}"
+          echo "Generated Individual Tokens    : ''${exclude_args[@]}"
+          echo -e "\033[1;33m======================================\033[0m\n"
+
+          if [[ -z "''${id}" ]]; then
+            if [[ -n "''${target_project}" ]]; then
+              echo -e "\033[1;32m✅ Triage complete for project: ''${target_project}!\033[0m"
+            else
+              echo -e "\033[1;32m✅ Inbox triage complete for this session!\033[0m"
+            fi
+            break
+          fi
+
+          echo -e "\033[1;35m--- Next Item: ''${id} ---\033[0m"
+          ''${taskBin} "''${id}" info
+          echo -e "\n\033[1;36mPRIORITY:\033[0m [H] High | [M] Medium | [L] Low | [Enter] Advance/Skip | [Q] Quit"
+          echo -n "🚀 Select option (h/m/l/Enter/q): "
+
+          local input=""
+          read -r input < /dev/tty
+          local action="''${input:u}"
+
+          if [[ "''${action}" == "Q" ]]; then
+            break
+          fi
+
+          case "''${action}" in
+            H|M|L)
+              ''${taskBin} "''${id}" modify priority:"''${action}" >/dev/null 2>&1
+              skipped_ids+=( "''${id}" )
+              ;;
+            *)
+              skipped_ids+=( "''${id}" )
+              ;;
+          esac
+          sleep 0.1
+        done
+      }
 
       tlo() {
         clear

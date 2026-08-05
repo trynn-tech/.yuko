@@ -9,4 +9,14 @@
     # ./gtk.nix
     # ./screen-locker.nix
   ];
+
+  # Essential system utility packages housed directly in core
+  home.packages = with pkgs; [
+    dmenu          
+    rofi            
+    arandr         
+    adwaita-icon-theme 
+    brightnessctl   
+    pavucontrol     
+  ];
 }

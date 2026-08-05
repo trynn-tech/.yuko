@@ -35,6 +35,7 @@ in
     programs.zsh = {
       enable = true;
       enableCompletion = true;
+      defaultKeymap = "viins";
       shellAliases = {
         ll = "ls -la"; la = "ls -lah"; l = "ls -lh";
         size = "du -hs"; ds = "du -hs";
@@ -49,16 +50,36 @@ in
       };
 
       initContent = ''
-        # --- AUTOSTART TMUX (Independent Sessions) ---
-        if [[ -z "$TMUX" ]] && [[ -n "$PS1" ]] && [[ $- == *i* ]]; then
-          exec tmux
-        fi
+	# --- AUTOSTART TMUX (Independent Numbered Sessions) ---
+	if [[ -z "$TMUX" ]] && [[ -n "$PS1" ]] && [[ $- == *i* ]]; then
+	  local active_sessions
+	  active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
+	
+	  local max_num=-1
+	  local name num
+	
+	  while IFS= read -r name; do
+	    # Strip all non-digit characters to get just the integer
+	    num="''${name//[^0-9]/}"
+	    if [[ -n "$num" ]]; then
+	      (( num > max_num )) && max_num=$num
+	    fi
+	  done <<< "$active_sessions"
+	
+	  local session_num=$(( max_num + 1 ))
+	  tmux new-session -s "$session_num"
+	fi
 
         export FLAKE="${yukoFlake}"
 
         if [ -e "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh" ]; then
           . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
         fi
+
+	# --- VI MODE FIXES ---
+        # Ensure backspace works properly in insert mode
+        bindkey -v '^?' backward-delete-char
+        bindkey -v '^H' backward-delete-char
 
         ccl() {
           if [ -n "$WAYLAND_DISPLAY" ]; then
@@ -70,8 +91,14 @@ in
           echo -e "\033[1;31m🧹 Clipboard securely wiped.\033[0m"
         }
 
-        yuko_snowball() {
+	yuko_snowball() {
           cd "${yukoFlake}" || return 1
+          
+          # Run offline check before formatting/activating if disconnected
+          if command -v yuko-offline-check &>/dev/null; then
+            yuko-offline-check
+          fi
+
           echo "[yuko] formatting..."
           nix fmt . 2>/dev/null
           echo "[yuko] activating configuration..."

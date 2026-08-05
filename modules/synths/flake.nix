@@ -1,0 +1,62 @@
+{
+  description = "Custom hardware-optimized local AI editing synth environment";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+
+        pythonEnv = pkgs.python311.withPackages (ps: with ps; [
+          gitpython
+          pydantic
+          rapidfuzz
+          tree-sitter
+          rich
+	  httpx
+        ]);
+
+        nativeTools = with pkgs; [
+          ripgrep
+          fd
+          sd
+          ast-grep
+          git
+          gnused
+          diffutils
+        ];
+
+      in {
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ pythonEnv ] ++ nativeTools;
+
+          shellHook = ''
+            export SYNTHS_ROOT="$(pwd)"
+            echo "=^-.-^= Local Synth Engine Shell Active"
+          '';
+        };
+
+        packages.default = pkgs.stdenv.mkDerivation {
+          pname = "local-synth-engine";
+          version = "0.1.0";
+
+          src = ./src;
+
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+
+          installPhase = ''
+            mkdir -p $out/libexec/synth-engine $out/bin
+            cp -r * $out/libexec/synth-engine/
+
+            makeWrapper ${pythonEnv}/bin/python $out/bin/synth \
+              --add-flags "$out/libexec/synth-engine/main.py" \
+              --prefix PATH : ${pkgs.lib.makeBinPath nativeTools}
+          '';
+        };
+      }
+    );
+}

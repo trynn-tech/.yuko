@@ -38,6 +38,15 @@
       set-window-option -g window-status-format " #I:#W "
       set-window-option -g window-status-current-format " [#I:#W] "
 
+      # Status left styling with explicit hex/color attributes
+      set-option -g status-left "#[fg=#af87ff,bold] #S #[default]"
+
+      # Styles the active window text (e.g., [1:nvim])
+      set -g window-status-current-format "#[fg=#00af87,bold][#I]"
+      
+      # Styles the inactive windows (optional, sets them to a muted gray)
+      set -g window-status-format "#[fg=#6e6a86][#I]"
+
       # Status right styling with explicit hex/color attributes
       # Active (Neon Violet #af87ff), Inbox (Emerald #00af87), Separators (Mellow Teal #5fafaf)
       # Unsorted: Calm Cobalt (#5f87d7) if 1-7, Calm Coral (#d78787) if >7, hidden if 0
@@ -68,6 +77,9 @@
 
       # Use Ctrl + j inside copy-mode to instantly jump backward to your prompt signature (❯ )
       bind-key -T copy-mode-vi C-k send-keys -X search-backward "❯ "
+
+      # Kill the session automatically when the client detaches
+      set -g destroy-unattached on
     '';
   };
 }

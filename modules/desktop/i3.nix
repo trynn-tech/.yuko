@@ -6,7 +6,7 @@ with lib;
 let
   cfg = config.myDesktop;
   arandrScript = ./assets/default.sh;
-  vlcStartupDir = "~/yt";
+  vlcStartupDir = "~/Music";
 in {
   options.myDesktop.wallpaper = mkOption {
     type = types.path;
@@ -61,6 +61,29 @@ in {
           };
         };
 
+	# Define the Resize Mode block
+        modes = {
+          resize = {
+            # Vim-style directional resizing
+            "h" = "resize shrink width 10 px or 10 ppt";
+            "j" = "resize grow height 10 px or 10 ppt";
+            "k" = "resize shrink height 10 px or 10 ppt";
+            "l" = "resize grow width 10 px or 10 ppt";
+
+            # Arrow keys alternative
+            "Left"  = "resize shrink width 10 px or 10 ppt";
+            "Down"  = "resize grow height 10 px or 10 ppt";
+            "Up"    = "resize shrink height 10 px or 10 ppt";
+            "Right" = "resize grow width 10 px or 10 ppt";
+
+            # Exit resize mode back to default state
+            "Return" = "mode \"default\"";
+            "Escape" = "mode \"default\"";
+            "Mod4+r" = "mode \"default\"";
+          };
+        };
+
+
         keybindings = lib.mkOptionDefault {
           "Mod4+1" = "workspace 1";
           "Mod4+2" = "workspace 2";
@@ -104,19 +127,39 @@ in {
           "Mod4+Shift+k" = "move up";
           "Mod4+Shift+l" = "move right";
 
+          # Custom Pane Movements for working with two screens and nested panes 
+          "Mod4+f" = "workspace 2"; # Terminal Work
+          "Mod4+g" = "workspace 10"; # Internet Browser 
+          "Mod4+n" = "workspace 9"; # Aux often Music
+
+	 # Split orientation bindings
+	  "Mod4+v" = "split v"; # Split vertically (top/bottom)
+	  "Mod4+c" = "split h"; # Split horizontally (left/right)
+
+          # Enter Resize Mode
+          "Mod4+r" = "mode \"resize\"";
+
+          # Layout controls
+          "Mod4+w" = "layout tabbed";
+          "Mod4+e" = "layout toggle split";
+          "Mod4+a" = "focus parent";
+
+	  # TODO: Organize Descriptive Grouping Comments Here [a2606e64-ce0e-4c2f-82ce-512a2428406a]
           # Gamer Mode Toggle - pane focus indicator toggle
-          "Mod4+g" = "exec --no-startup-id i3-msg '[con_id=\"__focused__\"] border toggle'";
+          "Mod4+grave" = "exec --no-startup-id i3-msg '[con_id=\"__focused__\"] border toggle'";
           "Mod4+d" = "exec --no-startup-id ${pkgs.rofi}/bin/rofi -show drun";
           "Mod4+x" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
+	  "Mod4+t" = "exec --no-startup-id \"i3-msg 'split v; exec alacritty --class split_term,split_term'\"";
 
           "Mod4+Return" = "exec alacritty";
           "Mod4+space" = "exec alacritty";
           "Mod4+minus" = "scratchpad show";
+          #"Mod4+t" = "scratchpad show";
           "Mod4+Shift+w" = "exec alacritty -e nvim +VimwikiIndex";
           "Mod4+Shift+q" = "kill";
 
           "Mod4+b" = "exec pavucontrol";
-          "Mod4+f" = "exec firefox";
+          "Mod4+i" = "exec firefox";
 
           # Instantly reload arandr layout/tv setup hotkey
           "Mod4+F12" = "exec --no-startup-id ${arandrScript}";
@@ -172,6 +215,8 @@ in {
 
         # Automatically make Firefox fullscreen on workspace 1
         for_window [workspace="1" class="Firefox"] fullscreen enable
+	# Trigger resize automatically as soon as the window maps to X11
+        for_window [class="split_term"] resize set height 20 ppt
       '';
     };
 

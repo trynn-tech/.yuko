@@ -1,4 +1,4 @@
-# modules/editors/nixvim.nix
+# modules/editors/default.nix
 { config, pkgs, ... }:
 let
   pyEnv = pkgs.python3.withPackages (ps: with ps; [ 
@@ -7,6 +7,10 @@ let
   tw3Bin = "${pkgs.taskwarrior3}/bin/task";
 in
 {
+  imports = [
+    ./task_org.nix
+  ];
+
   programs.nixvim = {
     enable = true;
     python3Provider = {

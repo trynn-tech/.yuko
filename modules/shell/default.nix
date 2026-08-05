@@ -7,6 +7,7 @@ in
 {
   imports = [
     ./zsh
+    ./tmux
     ./ledger.nix
   ];
 
@@ -45,5 +46,18 @@ in
         )
       ''
     );
+
+    # Essential system utility packages housed directly in core
+    home.packages = with pkgs; [
+      alacritty      
+      curl
+      tree
+      vim
+      ripgrep
+      fd
+      fzf
+      pass
+    ];
+
   };
 }
