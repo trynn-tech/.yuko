@@ -149,7 +149,7 @@ in {
           "Mod4+grave" = "exec --no-startup-id i3-msg '[con_id=\"__focused__\"] border toggle'";
           "Mod4+d" = "exec --no-startup-id ${pkgs.rofi}/bin/rofi -show drun";
           "Mod4+x" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty -e yazi'\"";
-	  "Mod4+t" = "exec --no-startup-id \"i3-msg 'split v; exec alacritty --class split_term,split_term'\"";
+	  "Mod4+t" = "exec --no-startup-id \"i3-msg 'split h; exec alacritty --class split_term,split_term'\"";
 
           "Mod4+Return" = "exec alacritty";
           "Mod4+space" = "exec alacritty";
@@ -216,7 +216,7 @@ in {
         # Automatically make Firefox fullscreen on workspace 1
         for_window [workspace="1" class="Firefox"] fullscreen enable
 	# Trigger resize automatically as soon as the window maps to X11
-        for_window [class="split_term"] resize set height 20 ppt
+        for_window [class="split_term"] resize set width 20 ppt
       '';
     };
 

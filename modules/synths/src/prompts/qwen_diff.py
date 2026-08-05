@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # modules/synths/src/prompts/qwen_diff.py
 
-from typing import List
+from typing import List, Optional
 from engine.context import FileContext
 
 # -------------------------------------------------------------------
@@ -24,30 +24,40 @@ CRITICAL RULES:
 - Output ONLY valid FILE blocks and concise explanations."""
 
 
-# -------------------------------------------------------------------
-# Mode 2: CREATE SYSTEM PROMPT (NEW FILE CREATION)
-# -------------------------------------------------------------------
-def get_system_prompt(file_contexts: List[FileContext]) -> str:
+def get_system_prompt(
+    file_contexts: Optional[List[FileContext]] = None,
+    is_edit_mode: Optional[bool] = None,
+) -> str:
     """
-    Selects system prompt based on context state built by RepoContext:
+    Selects system prompt based on context state or explicit mode override:
     - Edit Mode: Modifying existing files.
     - Creation Mode: Writing a new file from scratch.
     """
+    # 1. Direct override pass from main.py dispatch
+    if is_edit_mode is not None:
+        if is_edit_mode:
+            return QWEN_EDIT_SYSTEM_PROMPT
+        
+        target_path = None
+        if file_contexts:
+            new_targets = [ctx for ctx in file_contexts if not ctx.exists or not ctx.content.strip()]
+            if new_targets:
+                target_path = new_targets[0].relative_path
+        return _create_prompt(target_file=target_path)
+
+    # 2. Context inspection fallback
     if not file_contexts:
         return _create_prompt(target_file=None)
 
-    # Inspect context objects produced by RepoContext.build_context()
     new_targets = [ctx for ctx in file_contexts if not ctx.exists or not ctx.content.strip()]
-
     if new_targets:
-        # Bind the resolved relative path from RepoContext
         target_path = new_targets[0].relative_path
         return _create_prompt(target_file=target_path)
 
     return QWEN_EDIT_SYSTEM_PROMPT
 
 
-def _create_prompt(target_file: str | None) -> str:
+def _create_prompt(target_file: Optional[str]) -> str:
     """Builds the file creation prompt using standard Markdown code fences."""
     if target_file and target_file not in [".", ""]:
         file_header_rule = f"FILE: {target_file}"
@@ -65,19 +75,14 @@ Your task is to write complete, working code for a newly requested file.
 [Full contents of the new file]
 
 CRITICAL RULES:
-
-    {path_guidance}
-
-    Always start directly with 'FILE: ' followed by the code block.
-
-    Wrap the file content inside standard Markdown code fences (<language_id> ... ).
-
-    Do NOT use SEARCH/REPLACE blocks for file creation."""
+{path_guidance}
+Always start directly with 'FILE: ' followed by the code block.
+Wrap the file content inside standard Markdown code fences (<language_id> ... ).
+Do NOT use SEARCH/REPLACE blocks for file creation."""
 
 def build_user_prompt(user_query: str, file_contexts: List[FileContext]) -> str:
     """Assembles user prompt context using RepoContext FileContext objects."""
     prompt_parts = []
-
     if file_contexts:
         prompt_parts.append("### REPOSITORY CONTEXT:\n")
         for ctx in file_contexts:
