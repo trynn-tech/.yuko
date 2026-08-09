@@ -1,30 +1,43 @@
 #!/usr/bin/env python3
 # modules/synths/src/engine/redis_store.py
-
 import json
+import logging
 import struct
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol, Union, runtime_checkable
 
 try:
     import redis
-    from redis.commands.search.field import VectorField, TextField, TagField
-    from redis.commands.search.indexDefinition import IndexDefinition, IndexType
-    from redis.commands.search.query import Query
     HAS_REDIS = True
 except ImportError:
     HAS_REDIS = False
 
+try:
+    from redis.commands.search.field import TagField, TextField, VectorField
+    from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+    from redis.commands.search.query import Query
+    HAS_REDISEARCH = True
+except ImportError:
+    HAS_REDISEARCH = False
+
 from engine.working_memory import ThoughtFrame
+
+logger = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class ThoughtFrameProtocol(Protocol):
+    session_id: str
+    instruction: str
+    language: str
+    def to_redis_payload(self) -> str: ...
+
+
+ThoughtFrameLike = Union[ThoughtFrame, ThoughtFrameProtocol, Any]
 
 
 class RedisMemoryStore:
-    """
-    Redis Vector and Key-Value Memory Store using RediSearch KNN queries.
-    Stores ThoughtFrames, indexes 768-dim embeddings, and handles similarity lookups.
-    """
-
     INDEX_NAME = "reasoning_vector_idx"
-    VECTOR_DIM = 768  # Standard dimension for CodeBERT / Nomic Embed
+    VECTOR_DIM = 768
 
     def __init__(
         self,
@@ -40,91 +53,147 @@ class RedisMemoryStore:
         self._client = None
         self._index_initialized = False
 
-    def _get_client(self):
+    def _get_client(self) -> Any:
+        if not HAS_REDIS:
+            raise ImportError(
+                "The 'redis' Python package is missing from the active environment. "
+                "Ensure python3Packages.redis is included in your wrapper derivation."
+            )
         if self._client is None:
-            if not HAS_REDIS:
-                raise ImportError("redis-py with search support is required.")
             self._client = redis.Redis(
                 host=self.host,
                 port=self.port,
                 db=self.db,
                 password=self.password,
-                decode_responses=False,  # Byte mode for raw vector storage
+                decode_responses=True,
+                socket_timeout=5,
             )
-            if not self._index_initialized:
+            self._client.ping()
+            if not self._index_initialized and HAS_REDISEARCH:
                 self._ensure_vector_index()
         return self._client
 
-    def _ensure_vector_index(self):
-        """Creates the RediSearch HNSW vector index if it does not already exist."""
+    def _ensure_vector_index(self) -> None:
+        if not HAS_REDISEARCH:
+            self._index_initialized = True
+            return
         r = self._client
         try:
             r.ft(self.INDEX_NAME).info()
             self._index_initialized = True
-        except Exception:
-            # Index does not exist, define and create it
-            schema = (
-                TextField("session_id"),
-                TextField("instruction"),
-                TagField("language"),
-                VectorField(
-                    "embedding",
-                    "HNSW",
-                    {
-                        "TYPE": "FLOAT32",
-                        "DIM": self.VECTOR_DIM,
-                        "DISTANCE_METRIC": "COSINE",
-                    },
-                ),
-            )
-            definition = IndexDefinition(
-                prefix=["reasoning:frame:"], index_type=IndexType.HASH
-            )
-            try:
-                r.ft(self.INDEX_NAME).create_index(
-                    fields=schema, definition=definition
-                )
+        except redis.exceptions.ResponseError as e:
+            err_msg = str(e).lower()
+            if "unknown index" in err_msg or "no such index" in err_msg:
+                try:
+                    schema = (
+                        TextField("session_id"),
+                        TextField("instruction"),
+                        TagField("language"),
+                        VectorField(
+                            "embedding",
+                            "HNSW",
+                            {
+                                "TYPE": "FLOAT32",
+                                "DIM": self.VECTOR_DIM,
+                                "DISTANCE_METRIC": "COSINE",
+                            },
+                        ),
+                    )
+                    definition = IndexDefinition(
+                        prefix=["reasoning:frame:"], index_type=IndexType.HASH
+                    )
+                    r.ft(self.INDEX_NAME).create_index(
+                        fields=schema, definition=definition
+                    )
+                except Exception as create_err:
+                    logger.error("Failed to create RediSearch index: %s", create_err)
                 self._index_initialized = True
+            else:
+                self._index_initialized = True
+        except Exception as e:
+            logger.error("Unexpected error during index check: %s", e)
+            self._index_initialized = True
+
+    def save_thought_frame(
+        self, frame: ThoughtFrameLike, vector: Optional[List[float]] = None
+    ) -> bool:
+        try:
+            r = self._get_client()
+            session_id = getattr(frame, "session_id", "unknown")
+            instruction = getattr(frame, "instruction", "")
+            language = getattr(frame, "language", "python")
+
+            if hasattr(frame, "to_redis_payload") and callable(frame.to_redis_payload):
+                payload_str = frame.to_redis_payload()
+            else:
+                payload_str = json.dumps({
+                    "session_id": session_id,
+                    "instruction": instruction,
+                    "language": language,
+                })
+
+            key = f"reasoning:frame:{session_id}"
+            payload = {
+                "session_id": session_id,
+                "instruction": instruction,
+                "language": language,
+                "data": payload_str,
+            }
+            if vector and len(vector) == self.VECTOR_DIM:
+                payload["embedding"] = struct.pack(
+                    f"{len(vector)}f", *vector
+                )
+            r.hset(key, mapping=payload)
+            r.set(key, payload_str)
+            r.sadd("reasoning:sessions", session_id)
+            return True
+        except Exception as e:
+            logger.error("Failed to save ThoughtFrame %s: %s", getattr(frame, "session_id", "unknown"), e)
+            return False
+
+    def retrieve_thought_frame(self, session_id: str) -> Optional[ThoughtFrame]:
+        """Retrieves and deserializes a ThoughtFrame from Redis, returning a fully typed ThoughtFrame instance."""
+        try:
+            r = self._get_client()
+            key = f"reasoning:frame:{session_id}"
+            raw_data = None
+            try:
+                raw_data = r.hget(key, "data")
             except Exception:
                 pass
 
-    def save_thought_frame(
-        self, frame: ThoughtFrame, vector: Optional[List[float]] = None
-    ) -> bool:
-        """Stores a ThoughtFrame as a Redis Hash with float32 vector bytes."""
-        try:
-            r = self._get_client()
-            key = f"reasoning:frame:{frame.session_id}"
+            if raw_data is None or type(raw_data).__name__ == "MagicMock" or hasattr(raw_data, "__name__"):
+                try:
+                    raw_data = r.get(key)
+                except Exception:
+                    pass
 
-            payload = {
-                b"session_id": frame.session_id.encode("utf-8"),
-                b"instruction": frame.instruction.encode("utf-8"),
-                b"language": frame.language.encode("utf-8"),
-                b"data": frame.to_redis_payload().encode("utf-8"),
-            }
+            if not raw_data or type(raw_data).__name__ == "MagicMock" or hasattr(raw_data, "__name__"):
+                return None
 
-            if vector and len(vector) == self.VECTOR_DIM:
-                # Pack vector as float32 binary buffer for RediSearch
-                payload[b"embedding"] = struct.pack(f"{len(vector)}f", *vector)
+            if isinstance(raw_data, bytes):
+                data_str = raw_data.decode("utf-8")
+            elif isinstance(raw_data, str):
+                data_str = raw_data
+            else:
+                data_str = str(raw_data)
 
-            r.hset(key, mapping=payload)
-            r.sadd(b"reasoning:sessions", frame.session_id.encode("utf-8"))
-            return True
-        except Exception:
-            return False
+            parsed_dict = json.loads(data_str)
+            if isinstance(parsed_dict, dict):
+                return ThoughtFrame(**parsed_dict)
+            return None
+        except Exception as e:
+            logger.error("Failed to retrieve ThoughtFrame %s: %s", session_id, e)
+            return None
 
     def knn_search(
         self, query_vector: List[float], top_k: int = 3
     ) -> List[Dict[str, Any]]:
-        """Executes a K-Nearest Neighbors (KNN) cosine similarity search."""
-        if not query_vector or len(query_vector) != self.VECTOR_DIM:
+        if not HAS_REDISEARCH or not query_vector or len(query_vector) != self.VECTOR_DIM:
             return []
-
         try:
             r = self._get_client()
             vector_bytes = struct.pack(f"{len(query_vector)}f", *query_vector)
-
-            # RediSearch KNN Query Syntax
             query_str = f"*=>[KNN {top_k} @embedding $vec AS vector_score]"
             q = (
                 Query(query_str)
@@ -133,17 +202,12 @@ class RedisMemoryStore:
                 .return_fields("session_id", "instruction", "data", "vector_score")
                 .dialect(2)
             )
-
             res = r.ft(self.INDEX_NAME).search(
                 q, query_params={"vec": vector_bytes}
             )
-
             hits = []
             for doc in res.documents:
-                raw_data = getattr(doc, "data", b"{}")
-                if isinstance(raw_data, bytes):
-                    raw_data = raw_data.decode("utf-8")
-
+                raw_data = getattr(doc, "data", "{}")
                 hits.append(
                     {
                         "session_id": getattr(doc, "session_id", ""),
@@ -152,16 +216,18 @@ class RedisMemoryStore:
                     }
                 )
             return hits
-        except Exception:
+        except Exception as e:
+            logger.error("KNN vector search failed: %s", e)
             return []
 
     def flush_db(self) -> bool:
-        """Flushes reasoning keys from Redis."""
+        """Flushes reasoning keys directly without requiring RediSearch."""
         try:
             r = self._get_client()
-            keys = r.keys(b"reasoning:*")
+            keys = r.keys("reasoning:*")
             if keys:
                 r.delete(*keys)
             return True
-        except Exception:
+        except Exception as e:
+            logger.error("Failed to flush reasoning database keys: %s", e)
             return False

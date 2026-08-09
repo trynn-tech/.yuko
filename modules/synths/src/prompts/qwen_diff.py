@@ -1,100 +1,153 @@
 #!/usr/bin/env python3
 # modules/synths/src/prompts/qwen_diff.py
 
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Tuple, Union
+
 from engine.context import FileContext
 
 # -------------------------------------------------------------------
-# Mode 1: EDIT SYSTEM PROMPT (SEARCH / REPLACE)
+# Phase 1: Planner Prompt (Reasoning Space)
 # -------------------------------------------------------------------
-QWEN_EDIT_SYSTEM_PROMPT = """You are a precise local code editing assistant.
-Your task is to propose exact code edits using compact SEARCH/REPLACE blocks.
+QWEN_PLANNER_SYSTEM_PROMPT = """You are an expert systems software architect.
+Analyze the instruction and how best to implement the instruction given the file. Formulate a concise execution plan for the code edits.
 
-### OUTPUT FORMAT RULES:
+Rules:
+1. If modifying an existing file, identify verbatim SEARCH anchors.
+2. If creating a new file or writing to an empty file, outline the complete module structure."""
+
+# -------------------------------------------------------------------
+# Phase 2: Diff Synthesizer Prompt (Action Space)
+# -------------------------------------------------------------------
+QWEN_EDIT_SYSTEM_PROMPT = """You are a deterministic code editing engine. Output ONLY valid edit blocks.
+
+STRICT FORMATTING RULES:
+1. DO NOT wrap output in markdown backtick fences (e.g. DO NOT use ```python or ```).
+2. For EXISTING files, use SEARCH/REPLACE blocks with exact contiguous SEARCH anchors:
 FILE: relative/path/to/file.ext
 <<<<<<< SEARCH
-[Exact contiguous context lines from original file]
+[Exact contiguous lines from target file]
 =======
 [Replacement lines]
 >>>>>>> REPLACE
 
-CRITICAL RULES:
-- Keep SEARCH blocks concise (2-5 lines).
-- Match SEARCH text verbatim (including indentation).
-- Output ONLY valid FILE blocks and concise explanations."""
+3. For NEW or EMPTY files, output full file creation blocks directly:
+FILE: relative/path/to/file.ext
+[Full file contents]
+"""
 
 
-def get_system_prompt(
-    file_contexts: Optional[List[FileContext]] = None,
-    is_edit_mode: Optional[bool] = None,
-) -> str:
-    """
-    Selects system prompt based on context state or explicit mode override:
-    - Edit Mode: Modifying existing files.
-    - Creation Mode: Writing a new file from scratch.
-    """
-    # 1. Direct override pass from main.py dispatch
-    if is_edit_mode is not None:
-        if is_edit_mode:
-            return QWEN_EDIT_SYSTEM_PROMPT
-        
-        target_path = None
-        if file_contexts:
-            new_targets = [ctx for ctx in file_contexts if not ctx.exists or not ctx.content.strip()]
-            if new_targets:
-                target_path = new_targets[0].relative_path
-        return _create_prompt(target_file=target_path)
+def get_planner_system_prompt() -> str:
+    return QWEN_PLANNER_SYSTEM_PROMPT
 
-    # 2. Context inspection fallback
-    if not file_contexts:
-        return _create_prompt(target_file=None)
 
-    new_targets = [ctx for ctx in file_contexts if not ctx.exists or not ctx.content.strip()]
-    if new_targets:
-        target_path = new_targets[0].relative_path
-        return _create_prompt(target_file=target_path)
-
+def get_edit_system_prompt() -> str:
     return QWEN_EDIT_SYSTEM_PROMPT
 
 
-def _create_prompt(target_file: Optional[str]) -> str:
-    """Builds the file creation prompt using standard Markdown code fences."""
-    if target_file and target_file not in [".", ""]:
-        file_header_rule = f"FILE: {target_file}"
-        path_guidance = f"The target file destination is strictly '{target_file}'."
-    else:
-        file_header_rule = "FILE: <path/to/new_file.ext>"
-        path_guidance = "Choose a meaningful relative path based on the user instruction (e.g., `app/heartbeat.py`). Do NOT write literal text like 'relative/path/to/file.py'."
+get_system_prompt = get_edit_system_prompt
 
-    return f"""You are a precise code generation assistant.
-Your task is to write complete, working code for a newly requested file.
 
-### OUTPUT FORMAT RULES:
-{file_header_rule}
-```<language_id>
-[Full contents of the new file]
-
-CRITICAL RULES:
-{path_guidance}
-Always start directly with 'FILE: ' followed by the code block.
-Wrap the file content inside standard Markdown code fences (<language_id> ... ).
-Do NOT use SEARCH/REPLACE blocks for file creation."""
-
-def build_user_prompt(user_query: str, file_contexts: List[FileContext]) -> str:
-    """Assembles user prompt context using RepoContext FileContext objects."""
+def build_planner_user_prompt(
+    user_query: str, file_contexts: List[FileContext]
+) -> str:
     prompt_parts = []
     if file_contexts:
-        prompt_parts.append("### REPOSITORY CONTEXT:\n")
+        prompt_parts.append("### TARGET FILE CONTENT:\n")
         for ctx in file_contexts:
             prompt_parts.append(f"FILE: {ctx.relative_path}")
             if ctx.exists and ctx.content:
-                prompt_parts.append("```")
+                prompt_parts.append("--- SOURCE START ---")
                 prompt_parts.append(ctx.content)
-                prompt_parts.append("```\n")
+                prompt_parts.append("--- SOURCE END ---\n")
             else:
-                prompt_parts.append(
-                    "[STATUS: Target file does not exist yet - pending creation]\n"
-                )
+                prompt_parts.append("[FILE IS CURRENTLY NEW / EMPTY]\n")
 
-    prompt_parts.append(f"### USER INSTRUCTION:\n{user_query}")
+    prompt_parts.append(f"### GOAL:\n{user_query}")
     return "\n".join(prompt_parts)
+
+
+def build_user_prompt(
+    user_query: str,
+    file_contexts: List[FileContext],
+    plan: str = "",
+) -> str:
+    prompt_parts = []
+    target_rel = file_contexts[0].relative_path if file_contexts else "target file"
+    is_empty = not file_contexts or not file_contexts[0].exists or not file_contexts[0].content.strip()
+
+    if file_contexts:
+        prompt_parts.append("### TARGET FILE CONTENT:\n")
+        for ctx in file_contexts:
+            prompt_parts.append(f"FILE: {ctx.relative_path}")
+            if ctx.exists and ctx.content:
+                prompt_parts.append("--- SOURCE START ---")
+                prompt_parts.append(ctx.content)
+                prompt_parts.append("--- SOURCE END ---\n")
+            else:
+                prompt_parts.append("[FILE IS CURRENTLY NEW / EMPTY]\n")
+
+    if plan.strip():
+        prompt_parts.append("<execution_plan>")
+        prompt_parts.append(plan.strip())
+        prompt_parts.append("</execution_plan>\n")
+
+    if is_empty:
+        prompt_parts.append(
+            f"### TASK:\nTarget `{target_rel}` is NEW/EMPTY. Output a complete file creation block starting with `FILE: {target_rel}` followed immediately by the complete implementation code for: {user_query}\n"
+            "REMINDER: Do NOT use search anchors for empty files. Do NOT use markdown code fences."
+        )
+    else:
+        prompt_parts.append(
+            f"### TASK:\nConstruct a valid SEARCH/REPLACE block targeting `{target_rel}` to achieve: {user_query}\n"
+            "REMINDER: Copy exact contiguous lines from SOURCE START/END into <<<<<<< SEARCH verbatim. Do NOT use markdown code fences."
+        )
+
+    return "\n".join(prompt_parts)
+
+
+class QwenDiffPrompt:
+    @staticmethod
+    def build_planner_prompts(
+        filepath: str,
+        content: str,
+        instruction: str,
+        repo_context: Union[str, List[FileContext]] = "",
+    ) -> Tuple[str, str]:
+        target_path = Path(filepath)
+        file_ctx = FileContext(
+            path=target_path,
+            relative_path=filepath,
+            content=content,
+            exists=target_path.exists(),
+        )
+        sys_prompt = get_planner_system_prompt()
+        usr_prompt = build_planner_user_prompt(instruction, [file_ctx])
+
+        if isinstance(repo_context, str) and repo_context.strip():
+            usr_prompt = f"{repo_context}\n\n{usr_prompt}"
+
+        return sys_prompt, usr_prompt
+
+    @staticmethod
+    def build_prompts(
+        filepath: str,
+        content: str,
+        instruction: str,
+        plan: str = "",
+        repo_context: Union[str, List[FileContext]] = "",
+    ) -> Tuple[str, str]:
+        target_path = Path(filepath)
+        file_ctx = FileContext(
+            path=target_path,
+            relative_path=filepath,
+            content=content,
+            exists=target_path.exists(),
+        )
+        sys_prompt = get_edit_system_prompt()
+        usr_prompt = build_user_prompt(instruction, [file_ctx], plan=plan)
+
+        if isinstance(repo_context, str) and repo_context.strip():
+            usr_prompt = f"{repo_context}\n\n{usr_prompt}"
+
+        return sys_prompt, usr_prompt

@@ -19,12 +19,19 @@
           tree-sitter-grammars.tree-sitter-python
           tree-sitter-grammars.tree-sitter-bash
           tree-sitter-grammars.tree-sitter-c
-          rich
+
+	  # Testing & Coverage
+          pytest
+          pytest-cov
+
+          # Network
           httpx
+
           # Memory & Graph Connectors
           redis
           neo4j
           sentence-transformers
+          einops
         ]);
         nativeTools = with pkgs; [
           ripgrep

@@ -99,7 +99,7 @@ in
       package = pkgs.taskwarrior3;
       extraConfig = ''
         data.location=~/.local/share/task
-        sync.server.url=http://100.117.104.112:8080
+        sync.server.url=http://100.78.85.44:8080
         sync.server.client_id=58f0b3c8-9c13-427d-8921-1cebfe441a70
         sync.encryption_secret=HelloInternet42!
         confirmation=no
