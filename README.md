@@ -1,0 +1,1 @@
+Greed k ... whatever ... need my browser cookies public too? anyway will fix the AST consumption and should be able to handle repos ... Aider will be a better option if you are less expierenced in coding ... this is simply a custom hobby solution ... have fun ... busy.
