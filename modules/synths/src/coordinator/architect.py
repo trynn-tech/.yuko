@@ -5,7 +5,6 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
-
 from coordinator.divergence import DivergenceHandler
 
 logger = logging.getLogger(__name__)
@@ -19,7 +18,9 @@ class RecipeStep(BaseModel):
 
 
 class ArchitectCoordinator:
-    """Coordinates task recipes using 3 in-place retries and 3 non-destructive divergence passes."""
+    """Coordinates multi-step reasoning recipes using the core Working Memory Pipeline,
+    LLM client generation, and 3-tier synchronization.
+    """
 
     def __init__(
         self,
@@ -28,12 +29,18 @@ class ArchitectCoordinator:
         graph_linker,
         redis_store=None,
         embedder=None,
+        memory_pipeline=None,
+        llm_client=None,
         enable_searxng: bool = True,
         enable_upstream: bool = True,
     ):
         self.executor = executor
         self.patcher = patcher
         self.graph_linker = graph_linker
+        self.redis_store = redis_store
+        self.embedder = embedder
+        self.memory_pipeline = memory_pipeline
+        self.llm_client = llm_client
         self.divergence = DivergenceHandler(redis_store=redis_store, embedder=embedder)
         self.enable_searxng = enable_searxng
         self.enable_upstream = enable_upstream
@@ -52,65 +59,110 @@ class ArchitectCoordinator:
         return steps
 
     def execute_step(self, step: RecipeStep) -> bool:
-        """Executes a single step with 3 in-place retries + 3 non-destructive divergence steps."""
+        """Executes a single step using the robust Working Memory Pipeline and LLM client."""
         logger.info("Executing Recipe Step %d on %s", step.step_id, step.target_file)
         
         file_path = Path(step.target_file)
         file_content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
-        failed_anchors = []
+        
+        if not self.llm_client:
+            logger.error("LLM client not available in ArchitectCoordinator.")
+            return False
+
+        system_prompt = (
+            "CRITICAL: Output ONLY valid SEARCH and REPLACE blocks or code blocks. "
+            "Never include conversational prose, preambles, or explanations."
+        )
+        user_prompt = f"Target File: {step.target_file}\nInstruction: {step.instruction}\n\nCurrent Content:\n{file_content}"
+
+        failed_attempts = 0
         context_enrichment = ""
 
-        # Phase 1: In-Place Retries (Attempts 1 to 3)
+        # Phase 1: In-Place Execution Passes (Attempts 1 to 3)
         for attempt in range(1, 4):
-            logger.info("In-Place Attempt %d/3 for %s", attempt, step.target_file)
+            logger.info("In-Place Synthesis Attempt %d/3 for %s", attempt, step.target_file)
             
-            prompt = step.instruction
+            current_prompt = user_prompt
             if context_enrichment:
-                prompt += f"\n\n### ADDITIONAL CONTEXT:\n{context_enrichment}"
+                current_prompt += f"\n\n### ADDITIONAL CONTEXT:\n{context_enrichment}"
 
-            patch_applied = self.executor.run_edit_pass(
-                filepath=step.target_file,
-                instruction=prompt,
-                content=file_content,
-            )
+            try:
+                raw_response = (
+                    self.llm_client.generate(system_prompt, current_prompt)
+                    if hasattr(self.llm_client, "generate")
+                    else self.llm_client.generate_stream(system_prompt, current_prompt)
+                )
 
-            if patch_applied:
-                step.completed = True
-                self._post_edit_sync(step.target_file)
-                return True
+                # Process through Working Memory Pipeline (parses, validates, 3-tier sync)
+                if self.memory_pipeline:
+                    frame = self.memory_pipeline.process_synthesis(
+                        instruction=step.instruction,
+                        raw_llm_response=raw_response,
+                        llm_client=self.llm_client,
+                        explicit_target=file_path,
+                        original_code=file_content,
+                    )
+                else:
+                    frame = None
 
-            failed_anchors.append(f"Attempt {attempt} failed to locate anchor.")
+                # Apply parsed blocks atomically via Executor
+                blocks = self.patcher.parse_blocks(raw_response, fallback_filepath=step.target_file)
+                applied_any = False
+                for block in blocks:
+                    target = block.filepath or step.target_file
+                    r_block = block.replace_block if block.replace_block.strip() else block.search_anchor
+                    success = self.executor.apply_anchor_edit(
+                        filepath=target,
+                        search_anchor=block.search_anchor,
+                        replace_block=r_block,
+                    )
+                    if success:
+                        applied_any = True
+
+                if applied_any or (frame and frame.verification_passed):
+                    step.completed = True
+                    self._post_edit_sync(step.target_file)
+                    return True
+
+            except Exception as e:
+                logger.warning("Attempt %d failed with error: %s", attempt, e)
+
+            failed_attempts += 1
 
         # Phase 2: Divergent Execution Passes (Attempts 4 to 6)
         logger.warning("In-place passes exhausted. Transitioning to Divergence Pipeline...")
 
-        # Divergence Pass 1: SearXNG Web / Spec Enrichment
         if self.enable_searxng:
             searxng_info = self.divergence.enrich_via_searxng(f"{step.target_file} {step.instruction}")
             context_enrichment += f"\n[Web/Doc Discovery]:\n{searxng_info}"
-            if self.executor.run_edit_pass(step.target_file, f"{step.instruction}\n{context_enrichment}", file_content):
-                step.completed = True
-                self._post_edit_sync(step.target_file)
-                return True
 
-        # Divergence Pass 2: Upstream LLM Strategy Query
         if self.enable_upstream:
-            upstream_info = self.divergence.enrich_via_upstream_api(file_content, step.instruction, failed_anchors)
+            upstream_info = self.divergence.enrich_via_upstream_api(file_content, step.instruction, [f"Failed attempt {failed_attempts}"])
             context_enrichment += f"\n[LLM Strategy Recommendation]:\n{upstream_info}"
-            if self.executor.run_edit_pass(step.target_file, f"{step.instruction}\n{context_enrichment}", file_content):
-                step.completed = True
-                self._post_edit_sync(step.target_file)
-                return True
 
-        # Divergence Pass 3: Redis Working Memory KNN Query
         redis_info = self.divergence.enrich_via_redis_memory(step.instruction)
         context_enrichment += f"\n[Historical Memory Insights]:\n{redis_info}"
-        if self.executor.run_edit_pass(step.target_file, f"{step.instruction}\n{context_enrichment}", file_content):
-            step.completed = True
-            self._post_edit_sync(step.target_file)
-            return True
 
-        logger.error("Step %d halted after 3 in-place and 3 divergent attempts.", step.step_id)
+        # Final unified divergence attempt
+        try:
+            current_prompt = user_prompt + f"\n\n### ADDITIONAL CONTEXT:\n{context_enrichment}"
+            raw_response = self.llm_client.generate(system_prompt, current_prompt)
+            blocks = self.patcher.parse_blocks(raw_response, fallback_filepath=step.target_file)
+            applied_any = False
+            for block in blocks:
+                target = block.filepath or step.target_file
+                r_block = block.replace_block if block.replace_block.strip() else block.search_anchor
+                if self.executor.apply_anchor_edit(target, block.search_anchor, r_block):
+                    applied_any = True
+
+            if applied_any:
+                step.completed = True
+                self._post_edit_sync(step.target_file)
+                return True
+        except Exception as e:
+            logger.error("Divergence pass execution failed: %s", e)
+
+        logger.error("Step %d halted after all attempts.", step.step_id)
         return False
 
     def _post_edit_sync(self, filepath: str) -> None:
@@ -121,7 +173,7 @@ class ArchitectCoordinator:
             code = Path(filepath).read_text(encoding="utf-8")
             facts = self.patcher.extract_ast_facts(filepath, code)
             lang = self.patcher._detect_language(filepath)
-            
+
             self.graph_linker.sync_thought_frame_graph({
                 "resolved_path": filepath,
                 "language": lang,

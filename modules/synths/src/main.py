@@ -183,7 +183,7 @@ def main():
         console.print(f"  [bold]Code Coverage:[/bold] [cyan]{cov_results['coverage_pct']}%[/cyan]")
 
         if cov_results['uncovered_lines']:
-            console.print(f"  [yellow]⚠️ Uncovered lines in target:[/yellow] {cov_results['uncovered_lines']}")
+            console.print(f"  [yellow]⚠️ Uncovered lines in {seed_file}:[/yellow] {cov_results['uncovered_lines']}")
         if cov_results['error_output']:
             console.print(f"  [red]Errors/Warnings:\n{cov_results['error_output']}[/red]")
 
@@ -199,20 +199,24 @@ def main():
     if args.recipe_goal:
         target_files = args.targets or ([args.target_file] if args.target_file else [])
         if not target_files:
-            console.print("[red]Error: Composer mode requires at least one target file via -t/--targets or positional argument.[/red]")
-            sys.exit(1)
+            console.print("[yellow]⚠️ No target files specified. Letting Architect Coordinator infer targets from goal...[/yellow]")
+            target_files = []
+
         coordinator = ArchitectCoordinator(
             executor=executor,
             patcher=patcher,
             graph_linker=graph_linker,
             redis_store=redis_store,
             embedder=embedder,
+            memory_pipeline=memory_pipeline,
+            llm_client=llm_client,
             enable_searxng=not args.no_searxng,
             enable_upstream=not args.no_upstream,
         )
         console.print("[bold magenta]=^-.-^= Composer Coordinator Active[/bold magenta]")
         console.print(f"[cyan]Goal:[/cyan] {args.recipe_goal}")
-        console.print(f"[cyan]Targets:[/cyan] {', '.join(target_files)}\n")
+        console.print(f"[cyan]Targets:[/cyan] {', '.join(target_files) if target_files else '[Inferred by Architect]'}\n")
+        
         recipe = coordinator.create_recipe(goal=args.recipe_goal, target_files=target_files)
         overall_success = True
         for step in recipe:

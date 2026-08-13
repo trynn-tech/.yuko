@@ -10,7 +10,7 @@ let
 in {
   options.myDesktop.wallpaper = mkOption {
     type = types.path;
-    default = ./assets/default-bg.jpg;
+    default = ./assets/wallpaper.webp;
   };
 
   config = {

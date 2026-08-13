@@ -113,7 +113,7 @@ in
     };
 
     home.packages = with pkgs; [
-      nh gnused tree git tig psmisc wl-clipboard xclip
+      nh gnused tree git tig psmisc wl-clipboard xclip tldr
     ];
   };
 }
