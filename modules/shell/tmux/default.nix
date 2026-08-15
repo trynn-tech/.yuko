@@ -6,6 +6,7 @@
   programs.tmux = {
     enable = true;
     shell = "${pkgs.zsh}/bin/zsh";
+    prefix = "C-Space"; # Sets prefix to Ctrl+Space
     # Upgrade terminal to xterm-256color to fully support advanced color definitions
     terminal = "xterm-256color";
     mouse = true;

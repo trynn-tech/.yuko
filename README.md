@@ -9,3 +9,7 @@ anyway
 ...
 
 busy.
+
+Architecture developed in with OpenAI models such as ChatGPT
+
+Engineering and Design developed with Google models such as Gemini

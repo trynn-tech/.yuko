@@ -159,37 +159,58 @@ def main():
             console.print("[yellow]No matching ThoughtFrame found in Redis.[/yellow]")
         return
 
+
     # 2.5 Engine Self-Test & Coverage Integration (--test)
     if args.test:
         console.print("[bold cyan]🧪 Running Yuko Synthesizer Engine Self-Test & Coverage Audit...[/bold cyan]")
-        verifier = VerificationHook()
-
-        seed_file = "src/engine/redis_store.py"
+        
+        # 1. Quick 3-Tier Checks (Neo4j & Redis)
         dummy_vec = feature_embedder.encode("Initialize vector index and persist thought frames") if feature_embedder else [0.01] * 768
-
         console.print("[cyan]▶ Testing Neo4j & Redis Multi-File Context Resolution...[/cyan]")
         try:
             graph_ctx = graph_linker.retrieve_graph_context(keywords=["redis_store"], limit=5)
             redis_hits = redis_store.knn_search(query_vector=dummy_vec, top_k=2)
-            console.print(f"  [green]✓ Neo4j graph query executed successfully.[/green]")
+            console.print("  [green]✓ Neo4j graph query executed successfully.[/green]")
             console.print(f"  [green]✓ RediSearch KNN hits found:[/green] {len(redis_hits)} vectors")
         except Exception as e:
-            console.print(f"  [red]⚠️ 3-Tier context check warning: {e}[/red]")
+            console.print(f"  [yellow]⚠️ 3-Tier context check warning: {e}[/yellow]")
 
-        console.print("\n[cyan]▶ Running Pytest Coverage Suite (--cov)...[/cyan]")
-        cov_results = verifier.run_coverage_check(seed_file)
+        # 2. Live Streaming Pytest & Coverage Audit
+        console.print("\n[cyan]▶ Running Pytest Coverage Suite (Live Stream)...[/cyan]")
+        
+        import subprocess
+        cmd = ["pytest", "-v", "--cov=src", "--durations=5"]
+        
+        passed = True
+        with console.status("[bold yellow]Executing test suite live...", spinner="dots") as status:
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            # Stream output line-by-line in real time
+            for line in process.stdout:
+                line_str = line.strip()
+                if line_str:
+                    if "PASSED" in line_str:
+                        console.print(f"  [green]✔[/green] {line_str}")
+                    elif "FAILED" in line_str or "ERROR" in line_str:
+                        console.print(f"  [bold red]✖ {line_str}[/bold red]")
+                        passed = False
+                    else:
+                        console.print(f"    [dim]{line_str}[/dim]")
+                        
+            process.wait()
+            if process.returncode != 0:
+                passed = False
 
-        console.print(f"  [bold]Tests Passed:[/bold] {'[green]YES[/green]' if cov_results['tests_passed'] else '[red]NO[/red]'}")
-        console.print(f"  [bold]Code Coverage:[/bold] [cyan]{cov_results['coverage_pct']}%[/cyan]")
-
-        if cov_results['uncovered_lines']:
-            console.print(f"  [yellow]⚠️ Uncovered lines in {seed_file}:[/yellow] {cov_results['uncovered_lines']}")
-        if cov_results['error_output']:
-            console.print(f"  [red]Errors/Warnings:\n{cov_results['error_output']}[/red]")
-
-        if cov_results['tests_passed']:
+        if passed:
             console.print("\n[bold green]✨ Engine Self-Test & Verification Passed Successfully![/bold green]")
         else:
+            console.print("\n[bold red]❌ Test suite encountered errors or failures.[/bold red]")
             sys.exit(1)
         return
 

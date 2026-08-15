@@ -92,7 +92,7 @@ class RepoContext:
         return "\n\n".join(formatted_blocks)
 
     def get_sliding_window_context(
-        self, content: str, target_symbol: str = "", window_lines: int = 250, overlap: int = 50
+          self, content: str, target_symbol: str = "", window_lines: int = 250, overlap: int = 50
     ) -> List[Dict[str, Any]]:
         """Splits large source files into overlapping sliding windows prioritized by symbol relevance."""
         lines = content.splitlines()

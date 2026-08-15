@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3emed
 # modules/synths/src/reasoning/embedder.py
 
 import logging
@@ -34,14 +34,17 @@ class FeatureEmbedder:
             # Load with FP16 to keep memory footprint under 500MB VRAM
             self._model = SentenceTransformer(self.model_name, trust_remote_code=True)
 
-    def encode(self, text: Union[str, List[str]]) -> List[List[float]]:
-        """Encodes text or list of code blocks into normalized dense float vectors."""
+    def encode(self, text: Union[str, List[str]], task_type: str = "search_document") -> List[List[float]]:
+        """Encodes text. task_type should be 'search_document' for code, 'search_query' for prompts."""
         self._lazy_load()
         if isinstance(text, str):
             text = [text]
-        embeddings = self._model.encode(text, normalize_embeddings=True)
+            
+        # Nomic v1.5 requires specific task prefixes for accurate retrieval
+        prefixed_text = [f"{task_type}: {t}" for t in text]
+        
+        embeddings = self._model.encode(prefixed_text, normalize_embeddings=True)
         return embeddings.tolist()
-
 
 class TextEmbedder(FeatureEmbedder):
     """Convenience wrapper mapping FeatureEmbedder to single-string queries."""

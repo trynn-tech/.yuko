@@ -1,16 +1,15 @@
+# modules/synths/flake.nix
 {
   description = "Custom hardware-optimized local AI editing synth environment";
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
-
   outputs = { self, nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        pythonEnv = pkgs.python311.withPackages (ps: with ps; [
+        pythonEnv = pkgs.python3.withPackages (ps: with ps; [
           gitpython
           pydantic
           rapidfuzz
@@ -19,20 +18,26 @@
           tree-sitter-grammars.tree-sitter-python
           tree-sitter-grammars.tree-sitter-bash
           tree-sitter-grammars.tree-sitter-c
-
-	  # Testing & Coverage
+          
+          # Testing & Coverage
           pytest
           pytest-cov
-
+          
           # Network
           httpx
-
+          
           # Memory & Graph Connectors
           redis
           neo4j
           sentence-transformers
           einops
+          
+          # RAPTOR & Clustering Pipeline
+          umap-learn
+          scikit-learn
+          numba
         ]);
+        
         nativeTools = with pkgs; [
           ripgrep
           fd
@@ -52,7 +57,7 @@
             echo "=^-.-^= Local Synth Engine Shell Active"
           '';
         };
-
+        
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "local-synth-engine";
           version = "0.1.0";

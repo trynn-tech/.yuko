@@ -1,4 +1,3 @@
-# modules/synths/default.nix
 { config, pkgs, lib, ... }:
 
 let
@@ -26,7 +25,6 @@ let
     tree-sitter-grammars.tree-sitter-python
     tree-sitter-grammars.tree-sitter-bash
     tree-sitter-grammars.tree-sitter-c
-
     rich
 
     # Testing & Coverage
@@ -41,9 +39,14 @@ let
     neo4j
     sentence-transformers
     einops
+
+    # RAPTOR & Clustering Pipeline
+    umap-learn
+    scikit-learn
+    numba
   ]);
 
-synthPackage = pkgs.stdenv.mkDerivation {
+  synthPackage = pkgs.stdenv.mkDerivation {
     pname = "local-synth-engine";
     version = "0.1.0";
     src = ./src;
@@ -57,8 +60,8 @@ synthPackage = pkgs.stdenv.mkDerivation {
         --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
     '';
   };
-in
-{
+
+in {
   options.yuko.synths = {
     enable = lib.mkEnableOption "Custom Nix-bound local AI editing engine";
     apiBase = lib.mkOption {
@@ -96,7 +99,8 @@ in
       dbms.security.auth_enabled=false
     '';
 
-    systemd.user.services.neo4j = {      Unit = {
+    systemd.user.services.neo4j = {
+      Unit = {
         Description = "Neo4j Graph Database Service (Synth Memory Store)";
         After = [ "network.target" ];
       };
