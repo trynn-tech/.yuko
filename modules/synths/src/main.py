@@ -5,7 +5,6 @@ import argparse
 import sys
 from pathlib import Path
 from rich.console import Console
-
 from coordinator.architect import ArchitectCoordinator
 from engine.anchor_patch import AnchorPatcher
 from engine.executor import Executor
@@ -26,12 +25,12 @@ except ImportError:
 
 console = Console()
 
-
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Local Synth Engine (Nix-Bound / RTX 4060 Optimized)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+
     # Operational Modes
     mode_group = parser.add_argument_group("Execution Modes")
     mode_group.add_argument(
@@ -101,6 +100,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable upstream LLM strategy queries during divergence passes.",
     )
+
     return parser
 
 
@@ -159,11 +159,10 @@ def main():
             console.print("[yellow]No matching ThoughtFrame found in Redis.[/yellow]")
         return
 
-
     # 2.5 Engine Self-Test & Coverage Integration (--test)
     if args.test:
         console.print("[bold cyan]🧪 Running Yuko Synthesizer Engine Self-Test & Coverage Audit...[/bold cyan]")
-        
+
         # 1. Quick 3-Tier Checks (Neo4j & Redis)
         dummy_vec = feature_embedder.encode("Initialize vector index and persist thought frames") if feature_embedder else [0.01] * 768
         console.print("[cyan]▶ Testing Neo4j & Redis Multi-File Context Resolution...[/cyan]")
@@ -177,10 +176,21 @@ def main():
 
         # 2. Live Streaming Pytest & Coverage Audit
         console.print("\n[cyan]▶ Running Pytest Coverage Suite (Live Stream)...[/cyan]")
-        
+
         import subprocess
-        cmd = ["pytest", "-v", "--cov=src", "--durations=5"]
-        
+        cmd = [
+            "pytest",
+            "tests/",  # <--- Explicitly point pytest to the tests directory
+            "-v",
+            "--cov=src",
+            "--cov=engine",
+            "--cov=reasoning",
+            "--cov=coordinator",
+            "--cov=prompts",
+            "--cov=vista",
+            "--durations=5"
+        ]
+
         passed = True
         with console.status("[bold yellow]Executing test suite live...", spinner="dots") as status:
             process = subprocess.Popen(
@@ -190,7 +200,7 @@ def main():
                 text=True,
                 bufsize=1
             )
-            
+
             # Stream output line-by-line in real time
             for line in process.stdout:
                 line_str = line.strip()
@@ -202,7 +212,7 @@ def main():
                         passed = False
                     else:
                         console.print(f"    [dim]{line_str}[/dim]")
-                        
+
             process.wait()
             if process.returncode != 0:
                 passed = False
@@ -219,10 +229,7 @@ def main():
     # 3. Composer Mode (Multi-Step Recipe Execution)
     if args.recipe_goal:
         target_files = args.targets or ([args.target_file] if args.target_file else [])
-        if not target_files:
-            console.print("[yellow]⚠️ No target files specified. Letting Architect Coordinator infer targets from goal...[/yellow]")
-            target_files = []
-
+        
         coordinator = ArchitectCoordinator(
             executor=executor,
             patcher=patcher,
@@ -234,11 +241,17 @@ def main():
             enable_searxng=not args.no_searxng,
             enable_upstream=not args.no_upstream,
         )
+
         console.print("[bold magenta]=^-.-^= Composer Coordinator Active[/bold magenta]")
         console.print(f"[cyan]Goal:[/cyan] {args.recipe_goal}")
-        console.print(f"[cyan]Targets:[/cyan] {', '.join(target_files) if target_files else '[Inferred by Architect]'}\n")
         
         recipe = coordinator.create_recipe(goal=args.recipe_goal, target_files=target_files)
+        if not recipe:
+            console.print("[bold red]❌ Error: No valid target files could be identified or inferred for recipe.[/bold red]")
+            sys.exit(1)
+
+        console.print(f"[cyan]Resolved Targets:[/cyan] {', '.join([s.target_file for s in recipe])}\n")
+
         overall_success = True
         for step in recipe:
             success = coordinator.execute_step(step)
@@ -246,6 +259,7 @@ def main():
                 console.print(f"[bold red]❌ Recipe halted at Step {step.step_id}: {step.target_file}[/bold red]")
                 overall_success = False
                 break
+
         if overall_success:
             console.print("\n[bold green]✨ Composer Recipe Executed Successfully![/bold green]")
         else:
@@ -260,9 +274,11 @@ def main():
                 "via positional argument or -t/--targets.[/red]"
             )
             sys.exit(1)
+
         if not llm_client:
             console.print("[red]Error: LLM client could not be initialized in environment.[/red]")
             sys.exit(1)
+
         console.print(f"[bold green]=^-.-^= Synthesizing edits for {target_file}...[/bold green]")
         file_path = Path(target_file)
         original_content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""

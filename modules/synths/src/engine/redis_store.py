@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 # Determine if RedisSearch (RediSearch) modules/commands are available or provide test fallbacks
 try:
     from redis.commands.search.field import VectorField, TextField
-    from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+    try:
+        from redis.commands.search.index_definition import IndexDefinition, IndexType
+    except ImportError:
+        from redis.commands.search.indexDefinition import IndexDefinition, IndexType
     HAS_REDISEARCH = True
 except ImportError:
     class VectorField:
@@ -21,10 +24,19 @@ except ImportError:
     class TextField:
         def __init__(self, *args, **kwargs): pass
     class IndexDefinition:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            self.args = []
+            for k, v in kwargs.items():
+                if k == 'prefix':
+                    self.args.extend(['PREFIX', len(v)] + list(v))
+                elif k == 'index_type':
+                    self.args.extend(['ON', str(v)])
+        def __getattr__(self, name):
+            return []
     class IndexType:
         HASH = "HASH"
-    HAS_REDISEARCH = True
+        JSON = "JSON"
+    HAS_REDISEARCH = False
 
 
 class RedisMemoryStore:
@@ -76,6 +88,11 @@ class RedisMemoryStore:
                     TextField("language"),
                 )
                 definition = IndexDefinition(prefix=["thought:"], index_type=IndexType.HASH)
+                
+                # Ensure compatibility across redis-py versions where .args might be missing
+                if not hasattr(definition, "args") or definition.args is None:
+                    definition.args = ["PREFIX", "1", "thought:", "ON", "HASH"]
+
                 client.ft(self.index_name).create_index(schema, definition=definition)
                 self._index_initialized = True
             except Exception as e:

@@ -45,6 +45,7 @@ class ArchitectCoordinator:
         self.enable_searxng = enable_searxng
         self.enable_upstream = enable_upstream
 
+# TODO: fix and print steps perhaps even create test and then make sure if multiple files detected to create an arbitrary amount of create workflows ... perhaps store functions and do each although formulate independent thought based on context [d6ced142-c9df-4eca-9b67-60fb0b104bfc]
     def create_recipe(self, goal: str, target_files: List[str]) -> List[RecipeStep]:
         """Deconstructs a high-level goal into an ordered sequence of file steps."""
         steps = []
