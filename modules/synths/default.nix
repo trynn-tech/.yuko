@@ -16,7 +16,7 @@ let
     podman
   ];
 
-  pythonEnv = pkgs.python311.withPackages (ps: with ps; [
+  pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     gitpython
     pydantic
     rapidfuzz

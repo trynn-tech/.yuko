@@ -2,12 +2,6 @@
 { config, pkgs, ... }:
 
 let
-  pyEnv = pkgs.python3.withPackages (ps: with ps; [
-    pynvim
-    tasklib
-    six
-    packaging
-  ]);
   tw3Bin = "${pkgs.taskwarrior3}/bin/task";
 in
 {
@@ -17,15 +11,19 @@ in
 
   programs.nixvim = {
     enable = true;
-    python3Provider = {
-      enable = true;
-      package = pyEnv;
-    };
+
+    # Enable Python 3 provider and supply dependencies directly
+    withPython3 = true;
+    extraPython3Packages = ps: with ps; [
+      pynvim
+      tasklib
+      six
+      packaging
+    ];
+
     globals = {
       mapleader = " ";
       maplocalleader = " ";
-      python3_host_prog = "${pyEnv}/bin/python3";
-
       vimwiki_list = [{ path = "~/wiki_yuko/"; syntax = "markdown"; ext = ".md"; }];
       vimwiki_global_ext = 0;
 
@@ -40,6 +38,7 @@ in
       # UNDOTREE: Automatically switch focus to the tree window when toggled
       undotree_SetFocusWhenToggle = 1;
     };
+
     opts = {
       number = true;
       relativenumber = true;
@@ -47,27 +46,36 @@ in
       undofile = true;
       conceallevel = 2;
     };
+
     plugins = {
       treesitter.enable = true;
       web-devicons.enable = true;
       which-key.enable = true;
       telescope.enable = true;
       undotree.enable = true;
+      oil.enable = true;
       lsp.enable = true;
       lsp.servers.nixd.enable = true;
       lsp.servers.pyright.enable = true;
     };
+
     extraPlugins = with pkgs.vimPlugins; [ vimwiki taskwiki vim-plugin-AnsiEsc ];
     extraPackages = with pkgs; [ wl-clipboard xclip taskwarrior3 jq ];
 
     extraConfigLua = ''
       local builtin = require('telescope.builtin')
+
+      -- fzf find a file buffer
       vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Find Files" })
+      -- OIL: Open parent directory as a file buffer
+      vim.keymap.set("n", "<leader>jj", "<cmd>Oil<CR>", { desc = "Open parent directory (Oil)" })
+
       vim.keymap.set("n", "<leader>ww", "<cmd>VimwikiIndex<CR>", { desc = "Wiki Index" })
       vim.keymap.set("n", "<leader>tw", ":call YangSync()<CR>", { desc = "Manual Task Sync" })
-      
+
       -- UNDOTREE: Toggle undo history tree
-      vim.keymap.set("n", "<leader>u", "<cmd>UndotreeToggle<CR>", { desc = "Toggle Undotree" })
+      vim.keymap.set("n", "<leader>g", "<cmd>UndotreeToggle<CR>", { desc = "Toggle Undotree" }) 
+
 
       -- FUNCTION & CONFIG OBJECT JUMPING: Universal symbol navigation for Nix and Python
       vim.keymap.set("n", "<leader>n", function()
@@ -87,6 +95,7 @@ in
       -- PURPLE HIGHLIGHT FEATURE
       vim.api.nvim_set_hl(0, 'LeaderPurpleHighlight', { bg = '#8A2BE2', fg = '#FFFFFF', bold = true })
       local active_purple_match = nil
+
       vim.keymap.set("v", "<leader>h", function()
         vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "nx", false)
         if active_purple_match then
@@ -114,6 +123,7 @@ in
       end, { desc = "Toggle purple highlight on selection" })
     '';
 
+    # TODO: Assign PrettyPrintJsonWorkflows a leader key instead of autocmd [b74263ce-8a1d-4fb1-8bb1-827a21532eb0]
     extraConfigVim = ''
       filetype plugin on
       autocmd BufRead,BufNewFile ~/wiki_yuko/*.md set filetype=vimwiki

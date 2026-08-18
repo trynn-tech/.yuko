@@ -13,6 +13,7 @@
   # Essential system utility packages housed directly in core
   home.packages = with pkgs; [
     dmenu          
+    vicinae
     rofi            
     arandr         
     adwaita-icon-theme 

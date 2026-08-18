@@ -1,33 +1,69 @@
-// replace omnibar with more functional tab browsing
+// Navigation & Key Mappings
 api.unmap('t');
 api.map('t', 'T');
 api.map('T', 'on');
 api.map('M', 'om');
 
-
-//key changed as it is often used as a fullscreen hotkey
+// Ergonomic Key Overrides
 api.unmap('u');
-api.map("u", 'f');
-api.map("U", 'af');
-api.unmap('f')
+api.map('u', 'f');
+api.map('U', 'af');
+api.unmap('f');
+api.map('a', 'gf');
 
-//With this change just some ergonomics
-api.map('a','gf');
+// Tridactyl-inspired bindings
+api.map('H', 'S');
+api.map('L', 'D');
 
-//tridactly inspired
-api.map('H','S');
-api.map('L','D');
+// Hint Mode Shortcuts
+api.map('cd', ';fs');
 
-//Present hints to select focus
-api.map('cd',';fs');
+// Open Youtube Videos in Private mode
+api.mapkey('Y', 'Open current YouTube page in FreeTube', () => {
+  const url = window.location.href;
 
-// Theme: Cyber Rosé Pine
-const hintsCss =
-  "font-size: 13pt; font-family: 'JetBrains Mono NL', 'Cascadia Code', 'Helvetica Neue', Helvetica, Arial, sans-serif; border: 0px; color: #000000 !important; background: #711c91; background-color: #ff008d";
+  if (!/(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url)) {
+    api.Front.showPopup('Not a YouTube page');
+    return;
+  }
+
+  window.location.href = `freetube://${url}`;
+});
+
+api.mapkey('F', 'Open a hinted YouTube link in FreeTube', () => {
+  api.Hints.create('', (element) => {
+    const url = element.href;
+
+    if (!url || !/(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url)) {
+      api.Front.showPopup('That is not a YouTube link');
+      return;
+    }
+
+    window.location.href = `freetube://${url}`;
+  });
+});
+
+
+// --- Visual Theme: Cyber Rosé Pine with Neon Violet Tags ---
+
+// 1. Link Hints Styling (Neon Violet Background + Dark Text for Contrast)
+const hintsCss = `
+  font-size: 11pt !important;
+  font-weight: bold !important;
+  font-family: 'JetBrains Mono NL', 'Cascadia Code', 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+  border: 1px solid #000000 !important;
+  color: #000000 !important;
+  background: #bd93f9 !important;
+  background-color: #bd93f9 !important;
+  box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.4) !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
+`;
 
 api.Hints.style(hintsCss);
 api.Hints.style(hintsCss, "text");
 
+// 2. Global Theme CSS
 settings.theme = `
   .sk_theme {
     background: #191724;
@@ -72,7 +108,6 @@ settings.theme = `
   }
   body {
     margin: 0;
-
     font-family: "JetBrains Mono NL", "Cascadia Code", "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 12px;
   }
@@ -107,8 +142,7 @@ settings.theme = `
     width: 100%;
     flex: 1;
     font-size: 20px;
-    margin-bottom: 0;
-    padding: 0px 0px 0px 0.5rem;
+    margin-bottom: 0;    padding: 0px 0px 0px 0.5rem;
     background: transparent;
     border-style: none;
     outline: none;
@@ -143,8 +177,7 @@ settings.theme = `
   }
   #sk_omnibarSearchResult>ul>li {
     padding: 0.2rem 0rem;
-    display: block;
-    max-height: 600px;
+    display: block;    max-height: 600px;
     overflow-x: hidden;
     overflow-y: auto;
   }
@@ -263,8 +296,7 @@ settings.theme = `
     display: inline-block;
   }
   #sk_usage .feature_name {
-    text-align: center;
-    padding-bottom: 4px;
+    text-align: center;    padding-bottom: 4px;
   }
   #sk_usage .feature_name>span {
     border-bottom: 2px solid #524f67;
@@ -284,7 +316,7 @@ settings.theme = `
     line-height: 10px;
     vertical-align: middle;
     border: solid 1px #524f67;
-    border-bottom-lolor: #524f67;
+    border-bottom-color: #524f67;
     border-radius: 3px;
     box-shadow: inset 0 -1px 0 #21202e;
   }
@@ -319,12 +351,11 @@ settings.theme = `
     height: 14px;
     width: auto;
     justify-content: space-between;
-    align-items: center;
-    flex-direction: row-reverse;
+    align-items: center;    flex-direction: row-reverse;
     border-radius: 3px;
     padding: 10px 20px;
     margin: 5px;
-    background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#191724), color-stop(100%,#191724));
+    background: #191724;
     box-shadow: 0px 3px 7px 0px #21202e;
   }
   div.sk_tab_wrap {
@@ -354,17 +385,18 @@ settings.theme = `
     white-space: nowrap;
     color: #c4a7e7;
   }
+  /* Tab mode neon tags */
   div.sk_tab_hint {
     display: inline-block;
-    float:right;
+    float: right;
     font-size: 10pt;
     font-weight: bold;
-    padding: 0px 2px 0px 2px;
-    background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#191724), color-stop(100%,#191724));
-    color: #58ffeb;
-    border: solid 1px #7d12ff;
+    padding: 1px 4px;
+    background: #bd93f9;
+    color: #000000;
+    border: 1px solid #7d12ff;
     border-radius: 3px;
-    box-shadow: #21202e;
+    box-shadow: 0px 2px 5px #21202e;
   }
   #sk_tabs.vertical div.sk_tab_hint {
     position: initial;

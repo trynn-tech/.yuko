@@ -13,6 +13,14 @@
     copyq          
     feh            
     vlc
+    wireshark
+    btop
+    ncdu
+    caligula
+    freetube
+    zathura
+    playerctl
+    handy
   ];
 
 }

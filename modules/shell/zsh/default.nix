@@ -46,7 +46,7 @@ in
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
-        yuko-arch = "OPENAI_API_KEY=unused nix run nixpkgs#aider-chat -- --openai-api-base http://localhost:8081/v1 --model openai/architect --architect --edit-format editor-diff --no-stream --auto-commits";
+	ns = "nh search";
       };
 
       initContent = ''
@@ -93,6 +93,11 @@ in
 
 	yuko_snowball() {
           cd "${yukoFlake}" || return 1
+
+	  if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+            echo "[yuko] updating flake inputs..."
+            nix flake update
+          fi
           
           # Run offline check before formatting/activating if disconnected
           if command -v yuko-offline-check &>/dev/null; then
@@ -105,6 +110,12 @@ in
           home-manager switch -b backup --flake .#yuko-core
         }
 
+	lol(){
+	  yuko_snowball | clolcat
+	}
+
+	alias -g mew="| clolcat"
+
         [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme
         source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
         source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
@@ -113,7 +124,7 @@ in
     };
 
     home.packages = with pkgs; [
-      nh gnused tree git tig psmisc wl-clipboard xclip tldr
+      clolcat nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils
     ];
   };
 }

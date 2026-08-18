@@ -7,8 +7,9 @@
 
   # Essential system utility packages housed directly in core
   home.packages = with pkgs; [
-    copyq          
-    feh            
-    vlc
+    ghidra
+    gdb
+    nix-index
+    nix-alien
   ];
 }
