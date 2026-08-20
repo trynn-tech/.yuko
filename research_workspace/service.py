@@ -2,31 +2,25 @@
 
 import asyncio
 import random
-import time
+import string
 
-class BaseService:
+class UnimatrixService:
     async def health_check(self):
         return {"status": "healthy"}
 
     def log_event(self, message):
-        print(f"Log: {message}")
-
-    async def cmatrix(self):
-        while True:
-            line = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=100))
-            print(line, end="\r", flush=True)
-            await asyncio.sleep(0.1)
+        log_line = ''.join(random.choices(string.ascii_letters + string.digits, k=100))
+        print(log_line)
 
 # main.py
 
-from service import BaseService
+from service import UnimatrixService
 
 async def main():
-    service = BaseService()
+    service = UnimatrixService()
     status = await service.health_check()
     print(status)
     service.log_event("Service started")
-    await service.cmatrix()
 
 if __name__ == "__main__":
     import asyncio

@@ -1,3 +1,4 @@
+# modules/programs/firefox/default.nix
 { config, pkgs, ... }:
 
 let
@@ -30,15 +31,18 @@ in
         "network.IDN_show_punycode" = true;
 
         # --- Session & Cookies ---
-        "network.cookie.cookieBehavior" = 5;
-        "network.cookie.lifetimePolicy" = 0;
         "privacy.clearOnShutdown.cache" = true;
         "privacy.clearOnShutdown.offlineApps" = true;
         "privacy.clearOnShutdown.history" = false;
-        "privacy.sanitize.sanitizeOnShutdown" = true;
-        "privacy.clearOnShutdown.sessions" = false;
         "browser.sessionstore.resume_from_crash" = true;
         "browser.sessionstore.interval" = 30000;
+	# --- Session & Cookies (FIXED FOR GOOGLE PERSISTENCE) ---
+        "network.cookie.cookieBehavior" = 5;
+        "network.cookie.lifetimePolicy" = 0;
+        "privacy.clearOnShutdown.cookies" = false;       # Prevent cookie purges
+        "privacy.clearOnShutdown.sessions" = false;      # Preserve login sessions
+        "privacy.sanitize.sanitizeOnShutdown" = false;    # Disable global shutdown wipe
+
 
         # --- Network & DNS ---
         "network.trr.mode" = 2;

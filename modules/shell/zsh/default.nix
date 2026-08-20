@@ -43,6 +43,7 @@ in
         cy = "cd ${yukoFlake}";
         cs = "cd /etc/nixos";
         ym = "yuko_snowball";
+        yf = "yuko_roam";
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
@@ -111,20 +112,53 @@ in
         }
 
 	lol(){
-	  yuko_snowball | clolcat
+	  yuko_snowball | lolcat
 	}
 
-	alias -g mew="| clolcat"
+	yuko_roam() {
+          cd "${yukoFlake}" || return 1
+
+	  if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+            echo "[yuko] updating flake inputs..."
+            nix flake update
+          fi
+          
+          # Run offline check before formatting/activating if disconnected
+          if command -v yuko-offline-check &>/dev/null; then
+            yuko-offline-check
+          fi
+
+          echo "[yuko] formatting..."
+          nix fmt . 2>/dev/null
+          echo "[yuko] activating configuration..."
+          home-manager switch -b backup --flake .#yuko-fob
+        }
+
+	alias -g mew="| lolcat"
 
         [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme
         source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
         source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
         [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+
+	cat ${yukoFlake}/modules/desktop/assets/ghost.txt
+        if command -v task &> /dev/null; then
+            # Extract exactly 1 pending task with the highest urgency
+            NEXT_TASK=$(task active limit:1 2>/dev/null | grep -E '^[ ]*[0-9]' | sed -E 's/^[ ]*[0-9]+[ ]+[0-9\.]+[ ]+//')
+            
+            # Print the task focus banner right above your prompt
+            if [ -n "$NEXT_TASK" ]; then
+                echo " \e[1;33mFocus Task:\e[0m $NEXT_TASK\n" | lolcat
+            else
+                echo " \e[1;32mNo pending tasks! Your schedule is clear.\e[0m\n" lolcat
+            fi
+        fi
       '';
     };
 
     home.packages = with pkgs; [
-      clolcat nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils
+      nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils
+      fortune lolcat aaa jp2a unimatrix sl 
     ];
   };
 }

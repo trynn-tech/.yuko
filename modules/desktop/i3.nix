@@ -20,6 +20,7 @@ in {
       pkgs.kdePackages.kdeconnect-kde
       pkgs.procps # provides killall for i3status refreshes
       pkgs.vicinae
+      pkgs.i3lock
     ];
 
     xsession.windowManager.i3 = {
@@ -146,6 +147,10 @@ in {
           # Instantly reload arandr layout/tv setup hotkey
           "Mod4+F12" = "exec --no-startup-id ${arandrScript}";
 
+	  # Screen Lock Binding (Uses custom wallpaper color matching or standard fill)
+          "Mod4+Control+l" = "exec --no-startup-id ${pkgs.i3lock}/bin/i3lock -c 0a0612";
+
+	  # Media Controls
           "Mod4+p" = "exec playerctl -a play-pause";
 	  "Mod4+space" = "exec --no-startup-id playerctl --player=mpv play-pause";
 	  "Mod4+m" = "exec --no-startup-id playerctl --player=firefox play-pause";
