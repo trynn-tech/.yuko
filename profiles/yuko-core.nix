@@ -3,8 +3,8 @@
 
 {
   imports = [
-    # Core orchestrator (imports all other layer-1 modules automatically)
     ../modules/core
+    ../modules/networking
   ];
 
   # -------------------------------
@@ -32,6 +32,11 @@
 
     # Terminal Interface
     shell.default = true;
+
+    # -----------------------------------------------------------------
+    # Network Teardown Automation
+    # -----------------------------------------------------------------
+    networking.teardown.enable = true;
 
     # -----------------------------------------------------------------
     # Central Local AI Controller Endpoint Matrix

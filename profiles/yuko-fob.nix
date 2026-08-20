@@ -31,6 +31,11 @@
     shell.default = true;
     shell.zsh.enable = true;
 
+    # -----------------------------------------------------------------
+    # Network Construction Automation
+    # -----------------------------------------------------------------
+    networking.construct.enable = true;
+
     synths = {
       enable = true;
       modelName = "architect";

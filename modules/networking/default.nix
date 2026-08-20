@@ -4,5 +4,7 @@
     ./wan-gateway.nix
     ./syslog-receiver.nix
     ./openwrt-provision.nix
+    ./construct.nix
+    ./teardown.nix
   ];
 }
