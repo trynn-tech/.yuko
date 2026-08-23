@@ -44,7 +44,7 @@
       bind -r L resize-pane -R 5
 
       # Clear screen override (since Ctrl+L is swallowed by vim-tmux-navigator)
-      bind C-l send-keys 'C-l'
+      bind-key -n C-x send-keys C-l
 
       # =====================================================================
       # THEME & STATUS BAR STYLING (Neon Violet, Mellow Teal, Emerald)

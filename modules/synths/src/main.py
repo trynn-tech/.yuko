@@ -1,17 +1,41 @@
 #!/usr/bin/env python3
 # src/main.py
-
 import argparse
 import sys
+import time
 from pathlib import Path
 from rich.console import Console
+
 from coordinator.architect import ArchitectCoordinator
 from engine.anchor_patch import AnchorPatcher
 from engine.executor import Executor
-from engine.redis_store import RedisMemoryStore
-from engine.working_memory import WorkingMemoryPipeline
-from engine.verifier import VerificationHook
-from reasoning.embedder import TextEmbedder, FeatureEmbedder
+from memory import RedisMemoryStore, WorkingMemoryPipeline
+
+try:
+    from memory import render_thought_frame
+except ImportError:
+    # Graceful fallback renderer until memory package exposes render_thought_frame directly
+    def render_thought_frame(frame, console=None):
+        c = console or Console()
+        if isinstance(frame, dict):
+            c.print(f"[bold cyan]ThoughtFrame ID:[/bold cyan] {frame.get('session_id', 'N/A')}")
+            c.print(f"  [dim]Instruction:[/dim] {frame.get('instruction', '')}")
+            c.print(f"  [dim]Target File:[/dim] {frame.get('target_file', 'N/A')}")
+            c.print(f"  [dim]Verified:[/dim] {frame.get('verification_passed', False)}")
+            if "line_start" in frame:
+                c.print(f"  [dim]Line Bounds:[/dim] L{frame.get('line_start')} - L{frame.get('line_end')}")
+        else:
+            c.print(frame)
+
+try:
+    from engine.verifier import VerificationHook
+except ImportError:
+    try:
+        from engine.verification import VerificationHook
+    except ImportError:
+        VerificationHook = None
+
+from reasoning.embedder import FeatureEmbedder, TextEmbedder
 from reasoning.graph_linker import KnowledgeGraphLinker
 from reasoning.pipeline import ReasoningOrchestrator
 
@@ -24,6 +48,7 @@ except ImportError:
         LLMClient = None
 
 console = Console()
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -77,7 +102,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--memory-query",
         type=str,
         metavar="SESSION_ID",
-        help="Retrieve raw ThoughtFrame payload from Redis by session ID.",
+        help="Retrieve raw ThoughtFrame payload from Redis by session ID or explicit numeric timestamp head.",
+    )
+    db_group.add_argument(
+        "--watch",
+        action="store_true",
+        help="Observe real-time thought frame queue events.",
+    )
+    db_group.add_argument(
+        "--memory-step",
+        type=int,
+        default=0,
+        help="Historical depth step offset (1 = 1 frame back in time, -1 = 1 frame forward). Anchors to current time unless --memory-query provides a timestamp.",
     )
 
     # Engine Testing & Diagnostics
@@ -121,27 +157,33 @@ def main():
         redis_store=redis_store,
         graph_linker=graph_linker,
     )
+
     memory_pipeline = WorkingMemoryPipeline(
         patcher=patcher,
         store=redis_store,
         orchestrator=orchestrator,
     )
+
     executor = Executor()
     llm_client = LLMClient() if LLMClient else None
 
-    # 2. Database Maintenance Commands
+    # 2. Real-Time Stream Watcher
+    if args.watch:
+        from memory.redis_store import watch_thought_stream
+        watch_thought_stream(redis_store)
+        return
+
+    # 3. Database Maintenance & Query Commands
     if args.reset_db:
         console.print("[bold yellow]🧹 Resetting Reasoning Stores (Redis & Neo4j)...[/bold yellow]")
-        redis_ok = redis_store.flush_db()
+        redis_ok = getattr(redis_store, "flush_db", lambda: getattr(redis_store, "clear", lambda: True)())()
         neo_ok = graph_linker.flush_graph()
         if redis_ok:
             console.print("  [green]✓ Redis vector store flushed.[/green]")
-        else:
-            console.print("  [red]⚠️ Could not flush Redis server.[/red]")
+        else:            console.print("  [red]⚠️ Could not flush Redis server.[/red]")
         if neo_ok:
             console.print("  [green]✓ Neo4j graph purged.[/green]")
-        else:
-            console.print("  [red]⚠️ Could not purge Neo4j graph.[/red]")
+        else:            console.print("  [red]⚠️ Could not purge Neo4j graph.[/red]")
         return
 
     if args.inspect_graph:
@@ -150,21 +192,49 @@ def main():
         console.print(ctx)
         return
 
-    if args.memory_query:
-        console.print(f"[bold cyan]🔍 Querying Working Memory for session: '{args.memory_query}'[/bold cyan]")
-        frame = redis_store.retrieve_thought_frame(args.memory_query)
-        if frame:
-            console.print(frame)
-        else:
-            console.print("[yellow]No matching ThoughtFrame found in Redis.[/yellow]")
+    if args.memory_query is not None or args.memory_step != 0:
+        base_head = args.memory_query if args.memory_query is not None else time.time()
+        try:
+            ts_query = float(base_head)
+            frame, idx, total = redis_store.retrieve_nearest_thought_frame(
+                target_timestamp=ts_query,
+                offset_step=args.memory_step,
+            )
+            direction = "past" if args.memory_step > 0 else ("future" if args.memory_step < 0 else "head")
+            console.print(
+                f"[bold cyan]🔍 Memory Linked-List Traversal "
+                f"[Index: {idx + 1}/{total} | Step: {args.memory_step} ({direction})]:[/bold cyan]"
+            )
+            if frame:
+                render_thought_frame(frame, console=console)
+            else:
+                console.print("[yellow]No matching ThoughtFrame found.[/yellow]")
+        except ValueError:
+            if args.memory_step != 0:
+                console.print(
+                    "[bold yellow]⚠️ Note: --memory-step offset is ignored when querying an explicit non-numeric Session ID string.[/bold yellow]"
+                )
+            console.print(f"[bold cyan]🔍 Querying Working Memory for session: '{base_head}'[/bold cyan]")
+            frame = redis_store.retrieve_thought_frame(str(base_head))
+            if frame:
+                render_thought_frame(frame, console=console)
+            else:
+                console.print("[yellow]No matching ThoughtFrame found in Redis.[/yellow]")
         return
 
-    # 2.5 Engine Self-Test & Coverage Integration (--test)
+    # 4. Engine Self-Test & Coverage Integration (--test)
     if args.test:
         console.print("[bold cyan]🧪 Running Yuko Synthesizer Engine Self-Test & Coverage Audit...[/bold cyan]")
+        if feature_embedder:
+            encoded_vec = feature_embedder.encode("Initialize vector index and persist thought frames")
+            if isinstance(encoded_vec, list) and len(encoded_vec) > 0 and isinstance(encoded_vec[0], list):
+                dummy_vec: list[float] = [float(x) for x in encoded_vec[0]]
+            elif isinstance(encoded_vec, list):
+                dummy_vec = [float(x) for x in encoded_vec]
+            else:                dummy_vec = [0.01] * 768
+        else:
+            dummy_vec = [0.01] * 768
 
-        # 1. Quick 3-Tier Checks (Neo4j & Redis)
-        dummy_vec = feature_embedder.encode("Initialize vector index and persist thought frames") if feature_embedder else [0.01] * 768
         console.print("[cyan]▶ Testing Neo4j & Redis Multi-File Context Resolution...[/cyan]")
         try:
             graph_ctx = graph_linker.retrieve_graph_context(keywords=["redis_store"], limit=5)
@@ -174,13 +244,13 @@ def main():
         except Exception as e:
             console.print(f"  [yellow]⚠️ 3-Tier context check warning: {e}[/yellow]")
 
-        # 2. Live Streaming Pytest & Coverage Audit
         console.print("\n[cyan]▶ Running Pytest Coverage Suite (Live Stream)...[/cyan]")
-
         import subprocess
         cmd = [
+            sys.executable,
+            "-m",
             "pytest",
-            "tests/",  # <--- Explicitly point pytest to the tests directory
+            "tests/",
             "-v",
             "--cov=src",
             "--cov=engine",
@@ -188,31 +258,27 @@ def main():
             "--cov=coordinator",
             "--cov=prompts",
             "--cov=vista",
-            "--durations=5"
+            "--durations=5",
         ]
-
         passed = True
-        with console.status("[bold yellow]Executing test suite live...", spinner="dots") as status:
+        with console.status("[bold yellow]Executing test suite live...", spinner="dots"):
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1
+                bufsize=1,
             )
-
-            # Stream output line-by-line in real time
-            for line in process.stdout:
-                line_str = line.strip()
-                if line_str:
-                    if "PASSED" in line_str:
-                        console.print(f"  [green]✔[/green] {line_str}")
-                    elif "FAILED" in line_str or "ERROR" in line_str:
-                        console.print(f"  [bold red]✖ {line_str}[/bold red]")
-                        passed = False
-                    else:
-                        console.print(f"    [dim]{line_str}[/dim]")
-
+            if process.stdout is not None:
+                for line in process.stdout:
+                    line_str = line.strip()
+                    if line_str:
+                        if "PASSED" in line_str:
+                            console.print(f"  [green]✔[/green] {line_str}")
+                        elif "FAILED" in line_str or "ERROR" in line_str:
+                            console.print(f"  [bold red]✖ {line_str}[/bold red]")
+                            passed = False
+                        else:                            console.print(f"    [dim]{line_str}[/dim]")
             process.wait()
             if process.returncode != 0:
                 passed = False
@@ -226,10 +292,9 @@ def main():
 
     target_file = args.target_file or (args.targets[0] if args.targets else None)
 
-    # 3. Composer Mode (Multi-Step Recipe Execution)
+    # 5. Composer Mode (Multi-Step Recipe Execution)
     if args.recipe_goal:
         target_files = args.targets or ([args.target_file] if args.target_file else [])
-        
         coordinator = ArchitectCoordinator(
             executor=executor,
             patcher=patcher,
@@ -241,17 +306,14 @@ def main():
             enable_searxng=not args.no_searxng,
             enable_upstream=not args.no_upstream,
         )
-
         console.print("[bold magenta]=^-.-^= Composer Coordinator Active[/bold magenta]")
         console.print(f"[cyan]Goal:[/cyan] {args.recipe_goal}")
-        
         recipe = coordinator.create_recipe(goal=args.recipe_goal, target_files=target_files)
         if not recipe:
             console.print("[bold red]❌ Error: No valid target files could be identified or inferred for recipe.[/bold red]")
             sys.exit(1)
 
         console.print(f"[cyan]Resolved Targets:[/cyan] {', '.join([s.target_file for s in recipe])}\n")
-
         overall_success = True
         for step in recipe:
             success = coordinator.execute_step(step)
@@ -266,7 +328,7 @@ def main():
             sys.exit(1)
         return
 
-    # 4. Standard Single-File Synthesis Mode (-i / --input)
+    # 6. Standard Single-File Synthesis Mode (-i / --input)
     if args.prompt:
         if not target_file:
             console.print(
@@ -274,7 +336,6 @@ def main():
                 "via positional argument or -t/--targets.[/red]"
             )
             sys.exit(1)
-
         if not llm_client:
             console.print("[red]Error: LLM client could not be initialized in environment.[/red]")
             sys.exit(1)
@@ -283,16 +344,18 @@ def main():
         file_path = Path(target_file)
         original_content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
 
-        # Request generation from LLM
         system_prompt = (
             "CRITICAL: Output ONLY valid SEARCH and REPLACE blocks or code blocks. "
             "Never include conversational prose, preambles, or explanations."
         )
         user_prompt = f"Target File: {target_file}\nInstruction: {args.prompt}\n\nCurrent Content:\n{original_content}"
 
-        raw_response = llm_client.generate(system_prompt, user_prompt) if hasattr(llm_client, "generate") else llm_client.generate_stream(system_prompt, user_prompt)
+        raw_response = (
+            llm_client.generate(system_prompt, user_prompt)
+            if hasattr(llm_client, "generate")
+            else llm_client.generate_stream(system_prompt, user_prompt)
+        )
 
-        # Process through memory pipeline (parses, validates, predicts metadata, and triggers 3-tier sync)
         frame = memory_pipeline.process_synthesis(
             instruction=args.prompt,
             raw_llm_response=raw_response,
@@ -301,7 +364,6 @@ def main():
             original_code=original_content,
         )
 
-        # Apply parsed blocks atomically via Executor
         blocks = patcher.parse_blocks(raw_response, fallback_filepath=target_file)
         applied_any = False
         for block in blocks:
@@ -315,8 +377,10 @@ def main():
             if success:
                 applied_any = True
 
-        if applied_any and frame.verification_passed:
+        if applied_any and getattr(frame, "verification_passed", True):
             console.print(f"[bold green]✓ Applied changes and synchronized 3-tier memory (Redis, Vector, Neo4j) for {target_file}[/bold green]")
+            if frame:
+                render_thought_frame(frame, console=console)
         else:
             console.print(f"[bold red]❌ Synthesis or patching failed for {target_file}[/bold red]")
             sys.exit(1)

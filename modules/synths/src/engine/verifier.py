@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-# src/engine/verifier.py
-
+# tests/verifier.py
 import json
 import os
 import subprocess
@@ -13,15 +12,25 @@ console = Console()
 
 
 class VerificationHook:
-    """
-    Executes test suites with coverage (pytest-cov) and evaluates code health
+    """Executes test suites with coverage (pytest-cov) and evaluates code health
     as part of the neuro-symbolic feedback loop using the hermetic Python interpreter.
     """
 
     def __init__(self, root_path: Optional[Path] = None):
-        self.root_path = (root_path or Path.cwd()).resolve()
+        # Resolve root_path: if not provided, check if current file is in 'tests/'
+        # and walk up to project root.
+        if root_path is None:
+            cwd = Path.cwd().resolve()
+            if cwd.name == "tests":
+                self.root_path = cwd.parent
+            else:
+                self.root_path = cwd
+        else:
+            self.root_path = root_path.resolve()
 
-    def run_coverage_check(self, target_file: str, test_path: str = "tests") -> Dict[str, Any]:
+    def run_coverage_check(
+        self, target_file: str, test_path: str = "tests"
+    ) -> Dict[str, Any]:
         """Runs pytest with coverage pointing explicitly to the test suite directory with PYTHONPATH set."""
         results: Dict[str, Any] = {
             "tests_passed": False,
@@ -46,12 +55,14 @@ class VerificationHook:
                 "--cov-report=json",
                 "-q",
             ]
-            
-            # Inject src into PYTHONPATH so coverage tracks modules correctly
+
+            # Inject root and src into PYTHONPATH so coverage tracks modules correctly
             env = dict(os.environ)
             src_path = str(self.root_path / "src")
             existing_pp = env.get("PYTHONPATH", "")
-            env["PYTHONPATH"] = f"{src_path}:{existing_pp}" if existing_pp else src_path
+            env["PYTHONPATH"] = (
+                f"{src_path}:{existing_pp}" if existing_pp else src_path
+            )
 
             res = subprocess.run(
                 cmd,
@@ -63,22 +74,29 @@ class VerificationHook:
             )
 
             output_lower = res.stdout.lower()
-            no_tests_ran = "no tests ran" in output_lower or "collected 0 items" in output_lower
+            no_tests_ran = (
+                "no tests ran" in output_lower
+                or "collected 0 items" in output_lower
+            )
 
             if res.returncode == 0 and not no_tests_ran:
                 results["tests_passed"] = True
             else:
                 results["tests_passed"] = False
-                results["error_output"] = res.stderr.strip() or res.stdout.strip()
+                results["error_output"] = (
+                    res.stderr.strip() or res.stdout.strip()
+                )
                 if no_tests_ran and not results["error_output"]:
-                    results["error_output"] = "Pytest collected 0 test items or no tests were executed."
+                    results["error_output"] = (
+                        "Pytest collected 0 test items or no tests were executed."
+                    )
 
             cov_file = self.root_path / "coverage.json"
             if cov_file.exists():
                 cov_data = json.loads(cov_file.read_text(encoding="utf-8"))
                 files_cov = cov_data.get("files", {})
-
                 target_p = Path(target_file)
+
                 try:
                     rel_target = str(
                         target_p.relative_to(self.root_path)
@@ -96,11 +114,17 @@ class VerificationHook:
 
                 if matched_stats:
                     summary = matched_stats.get("summary", {})
-                    results["coverage_pct"] = float(summary.get("percent_covered", 0.0))
-                    results["uncovered_lines"] = matched_stats.get("missing_lines", [])
+                    results["coverage_pct"] = float(
+                        summary.get("percent_covered", 0.0)
+                    )
+                    results["uncovered_lines"] = matched_stats.get(
+                        "missing_lines", []
+                    )
                 else:
                     totals = cov_data.get("totals", {})
-                    results["coverage_pct"] = float(totals.get("percent_covered", 0.0))
+                    results["coverage_pct"] = float(
+                        totals.get("percent_covered", 0.0)
+                    )
 
         except subprocess.TimeoutExpired:
             results["tests_passed"] = False

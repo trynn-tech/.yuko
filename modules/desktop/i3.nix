@@ -153,7 +153,7 @@ in {
 	  # Media Controls
           "Mod4+p" = "exec playerctl -a play-pause";
 	  "Mod4+space" = "exec --no-startup-id playerctl --player=mpv play-pause";
-	  "Mod4+m" = "exec --no-startup-id playerctl --player=firefox play-pause";
+	  "Mod4+BackSpace" = "exec --no-startup-id playerctl --player=firefox play-pause";
 	  "Mod4+grave" = "exec --no-startup-id playerctl previous";
 	  "Mod4+q" = "exec --no-startup-id playerctl next";
 	  "Mod4+minus" = "exec --no-startup-id playerctl volume 0.2-";

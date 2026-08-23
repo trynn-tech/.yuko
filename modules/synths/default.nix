@@ -1,3 +1,4 @@
+# modules/synths/default.nix
 { config, pkgs, lib, ... }:
 
 let
@@ -27,6 +28,9 @@ let
     tree-sitter-grammars.tree-sitter-c
     rich
 
+    # Math & Vector Primitives
+    numpy
+
     # Testing & Coverage
     pytest
     pytest-cov
@@ -49,11 +53,22 @@ let
   synthPackage = pkgs.stdenv.mkDerivation {
     pname = "local-synth-engine";
     version = "0.1.0";
-    src = ./src;
+    src = ./.;
     nativeBuildInputs = [ pkgs.makeWrapper ];
     installPhase = ''
       mkdir -p $out/libexec/synth-engine $out/bin
-      cp -r * $out/libexec/synth-engine/
+
+      # Copy src and tests into libexec
+      if [ -d src ]; then
+        cp -r src/* $out/libexec/synth-engine/
+      else
+        cp -r * $out/libexec/synth-engine/
+      fi
+
+      if [ -d tests ]; then
+        cp -r tests $out/libexec/synth-engine/
+      fi
+
       makeWrapper ${pythonEnv}/bin/python $out/bin/synth \
         --add-flags "$out/libexec/synth-engine/main.py" \
         --set PYTHONPATH "$out/libexec/synth-engine" \
@@ -69,13 +84,11 @@ in {
       default = "http://localhost:8081/v1";
       description = "The root system API endpoint for local containerized inference models.";
     };
-    modelName = lib.mkOption {
-      type = lib.types.str;
+    modelName = lib.mkOption {      type = lib.types.str;
       default = "architect";
       description = "The target model identifier currently warm in VRAM.";
     };
-    searxngBase = lib.mkOption {
-      type = lib.types.str;
+    searxngBase = lib.mkOption {      type = lib.types.str;
       default = "http://localhost:8888";
       description = "The unified network address of the system-level SearXNG discovery engine.";
     };
@@ -156,6 +169,7 @@ in {
       SYNTH_API_BASE = cfg.apiBase;
       SYNTH_MODEL_NAME = cfg.modelName;
       SYNTH_SEARXNG_BASE = cfg.searxngBase;
+      PYTHONPATH = "$HOME/.config/synths/src:$PYTHONPATH";
     };
   };
 }

@@ -5,8 +5,8 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 from engine.anchor_patch import AnchorPatcher
-from engine.working_memory import WorkingMemoryPipeline, ThoughtFrame
-from engine.redis_store import RedisMemoryStore
+from memory import WorkingMemoryPipeline, ThoughtFrame
+from memory import RedisMemoryStore
 from reasoning.embedder import FeatureEmbedder
 
 
@@ -22,7 +22,7 @@ def test_anchor_patcher_comprehensive():
     assert patcher._validate_syntax(".nix", "{ pkgs, ... }: {\n}\n") is True
 
 
-@patch("engine.redis_store.redis.Redis")
+@patch("memory.redis_store.redis.Redis")
 def test_redis_memory_store_operations(mock_redis_client):
     # Setup mock redis behavior with clean, explicit byte payloads
     mock_instance = mock_redis_client.return_value

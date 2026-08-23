@@ -3,8 +3,8 @@
 
 from typing import Any, Dict, Optional
 
-from engine.redis_store import RedisMemoryStore
-from engine.working_memory import ThoughtFrame
+from memory import RedisMemoryStore
+from memory import ThoughtFrame
 from reasoning.embedder import FeatureEmbedder
 from reasoning.graph_linker import KnowledgeGraphLinker
 

@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # modules/synths/src/engine/executor.py
+import difflib
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
+
 import git
 from rich.console import Console
-from engine.context import RepoContext
+
 from engine.anchor_patch import AnchorPatcher
+from engine.context import RepoContext
 
 console = Console()
+
 
 class Executor:
     """
@@ -17,6 +21,7 @@ class Executor:
     - `sd` for string/regex operations
     - `git` for tracking, diff creation, and rollback safety
     """
+
     def __init__(self, repo_path: Optional[Path] = None):
         self.repo_path = (repo_path or Path.cwd()).resolve()
         self.has_sd = shutil.which("sd") is not None
@@ -26,31 +31,20 @@ class Executor:
         except git.InvalidGitRepositoryError:
             self.repo = None
 
-    def run_edit_pass(self, *args: Any, **kwargs: Any) -> bool:
-        """
-        Orchestrates an edit pass supporting multiple calling conventions from architect.py:
-        - run_edit_pass(step_obj)
-        - run_edit_pass(filepath, search, replace)
-        - run_edit_pass(raw_output: str, fallback_filepath: str = "")
-        """
-        patcher = AnchorPatcher()
+    def run_edit_pass(self, *args: Any, **kwargs: Any) -> bool:        patcher = AnchorPatcher()
 
-        # 1. Explicit positional arguments: (filepath, search, replace)
         if len(args) >= 3:
             return self.apply_anchor_edit(str(args[0]), str(args[1]), str(args[2]))
-        
-        # 2. Keyword arguments
+
         if "filepath" in kwargs and "replace" in kwargs:
             return self.apply_anchor_edit(
                 kwargs.get("filepath", ""),
                 kwargs.get("search_anchor", kwargs.get("search", "")),
-                kwargs.get("replace_block", kwargs.get("replace", ""))
+                kwargs.get("replace_block", kwargs.get("replace", "")),
             )
 
-        # 3. Step object or dictionary / string payload
         arg = args[0] if args else kwargs.get("step", kwargs.get("payload", None))
         if arg is not None:
-            # Check if object/dict has step attributes
             if hasattr(arg, "target_file") or (isinstance(arg, dict) and "target_file" in arg):
                 if isinstance(arg, dict):
                     fpath = arg.get("target_file", "")
@@ -85,7 +79,6 @@ class Executor:
                     if not res:
                         success_all = False
                 return success_all
-
         return False
 
     def apply_anchor_edit(
@@ -94,9 +87,6 @@ class Executor:
         search_anchor: str,
         replace_block: str,
     ) -> bool:
-        """
-        Applies a patch atomically with recursive path resolution fallback.
-        """
         context_finder = RepoContext(root_path=self.repo_path)
         target_file = Path(filepath)
         if not target_file.is_absolute():
@@ -129,10 +119,13 @@ class Executor:
             return False
 
         stash_created = self._git_checkpoint(target_file)
+
         norm_search = search_anchor.replace("\r\n", "\n")
         norm_replace = replace_block.replace("\r\n", "\n")
         norm_content = original_content.replace("\r\n", "\n")
+
         success = False
+        line_bounds: Optional[Tuple[int, int]] = None
 
         if self.has_sd and norm_search in norm_content:
             success = self._apply_via_sd(target_file, norm_search, norm_replace)
@@ -143,12 +136,18 @@ class Executor:
             )
 
         if not success:
-            success = self._apply_fuzzy_splice(
+            success, line_bounds = self._apply_fuzzy_splice(
                 target_file, norm_content, norm_search, norm_replace
             )
 
         if success:
-            console.print(f"[green]Successfully patched {target_file.name}[/green]")
+            if line_bounds:
+                console.print(
+                    f"[green]Successfully spliced {target_file.name} "
+                    f"[Lines {line_bounds[0]}-{line_bounds[1]}][/green]"
+                )
+            else:
+                console.print(f"[green]Successfully patched {target_file.name}[/green]")
             return True
         else:
             console.print(
@@ -177,29 +176,62 @@ class Executor:
 
     def _apply_fuzzy_splice(
         self, target_file: Path, content: str, search: str, replace: str
-    ) -> bool:
-        search_lines = [l.strip() for l in search.splitlines() if l.strip()]
+    ) -> Tuple[bool, Optional[Tuple[int, int]]]:
+        """
+        Performs flexible line-based splicing using exact stripped-line matching
+        followed by difflib sequence matching, preserving line indentation.
+        """
+        search_lines = [l for l in search.splitlines() if l.strip()]
         if not search_lines:
-            return False
+            return False, None
+
         file_lines = content.splitlines(keepends=True)
+        stripped_file = [l.strip() for l in file_lines]
+        stripped_search = [l.strip() for l in search_lines]
+
         match_start, match_end = -1, -1
-        for i in range(len(file_lines) - len(search_lines) + 1):
-            window = [file_lines[i + j].strip() for j in range(len(search_lines))]
-            if window == search_lines:
+
+        # Pass 1: Exact stripped line sliding window
+        window_size = len(stripped_search)
+        for i in range(len(stripped_file) - window_size + 1):
+            if stripped_file[i : i + window_size] == stripped_search:
                 match_start = i
-                match_end = i + len(search_lines)
+                match_end = i + window_size
                 break
+
+        # Pass 2: Fuzzy sequence matcher for partial/imperfect anchor blocks
+        if match_start == -1 and len(stripped_file) >= window_size:
+            best_ratio = 0.75  # Threshold minimum cutoff
+            for i in range(len(stripped_file) - window_size + 1):
+                window = stripped_file[i : i + window_size]
+                ratio = difflib.SequenceMatcher(None, window, stripped_search).ratio()
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    match_start = i
+                    match_end = i + window_size
+
         if match_start != -1:
-            replacement_formatted = (
-                replace if replace.endswith("\n") else replace + "\n"
-            )
+            # Infer indent prefix from first matched line
+            first_line = file_lines[match_start]
+            indent_prefix = first_line[: len(first_line) - len(first_line.lstrip())]
+
+            replace_lines = replace.splitlines()
+            formatted_replacement = []
+            for line in replace_lines:
+                if line.strip():
+                    formatted_replacement.append(f"{indent_prefix}{line.strip()}\n")
+                else:
+                    formatted_replacement.append("\n")
+
             new_lines = (
                 file_lines[:match_start]
-                + [replacement_formatted]
+                + formatted_replacement
                 + file_lines[match_end:]
             )
-            return self._write_file_safe(target_file, "".join(new_lines))
-        return False
+            write_ok = self._write_file_safe(target_file, "".join(new_lines))
+            return write_ok, (match_start + 1, match_end)
+
+        return False, None
 
     def _create_file(self, target_file: Path, content: str) -> bool:
         try:
@@ -228,8 +260,7 @@ class Executor:
     def _git_checkpoint(self, target_file: Path) -> bool:
         if not self.repo:
             return False
-        try:
-            rel_path = str(target_file.relative_to(self.repo_path))
+        try:            rel_path = str(target_file.relative_to(self.repo_path))
             return rel_path in self.repo.untracked_files or self.repo.is_dirty(
                 path=rel_path
             )
@@ -250,6 +281,7 @@ class Executor:
                 except OSError:
                     pass
             return
+
         if self.repo and stash_created:
             try:
                 rel_path = str(target_file.relative_to(self.repo_path))
@@ -257,4 +289,5 @@ class Executor:
                 return
             except Exception:
                 pass
+
         self._write_file_safe(target_file, original_content)

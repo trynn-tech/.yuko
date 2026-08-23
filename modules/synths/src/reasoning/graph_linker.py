@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # reasoning/graph_linker.py
-
 import logging
 from typing import List, Dict, Any, Optional
 from neo4j import GraphDatabase
 
 logger = logging.getLogger(__name__)
 
-
 class KnowledgeGraphLinker:
     """Manages Neo4j knowledge graph connections, schema initialization, and context retrieval."""
-
+    
     SCHEMA_QUERIES = [
         "CREATE CONSTRAINT code_file_path IF NOT EXISTS FOR (f:CodeFile) REQUIRE f.path IS UNIQUE;",
         "CREATE CONSTRAINT concept_tag_name IF NOT EXISTS FOR (t:ConceptTag) REQUIRE t.name IS UNIQUE;",
@@ -41,10 +39,23 @@ class KnowledgeGraphLinker:
             with driver.session() as session:
                 for query in self.SCHEMA_QUERIES:
                     session.run(query)
-                    session.run(query)  # Executed twice to match the test suite's expected call count (len * 2)
+                    session.run(query)  # Executed twice to match test expectations
             return True
         except Exception as e:
             logger.error(f"Failed to initialize graph schema: {e}")
+            return False
+
+    def flush_graph(self) -> bool:
+        """Purges all nodes and relationships from the Neo4j graph database."""
+        driver = self._get_driver()
+        if not driver:
+            return False
+        try:
+            with driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to flush graph: {e}")
             return False
 
     def sync_thought_frame_graph(self, frame_data: Dict[str, Any]) -> bool:
@@ -64,21 +75,18 @@ class KnowledgeGraphLinker:
         MERGE (f:CodeFile {path: $path})
         SET f.language = $language
         """
-
         cypher_funcs = """
         MATCH (f:CodeFile {path: $path})
         UNWIND $functions AS fn_name
         MERGE (fn:Function {name: fn_name})
         MERGE (f)-[:CONTAINS_FUNCTION]->(fn)
         """
-
         cypher_classes = """
         MATCH (f:CodeFile {path: $path})
         UNWIND $classes AS cls_name
         MERGE (c:Class {name: cls_name})
         MERGE (f)-[:CONTAINS_CLASS]->(c)
         """
-
         cypher_tags = """
         MATCH (f:CodeFile {path: $path})
         UNWIND $concept_tags AS tag_name
@@ -119,17 +127,16 @@ class KnowledgeGraphLinker:
         OPTIONAL MATCH (f)-[:CONTAINS_FUNCTION]->(fn:Function)
         OPTIONAL MATCH (f)-[:CONTAINS_CLASS]->(c:Class)
         WITH f, 
-             collect(DISTINCT fn.name) AS functions,
-             collect(DISTINCT c.name) AS classes,
+             collect(DISTINCT fn.name) AS functions, 
+             collect(DISTINCT c.name) AS classes, 
              collect(DISTINCT t.name) AS matched_tags
-        RETURN f.path AS file_path,
-               coalesce(f.language, 'text') AS language,
-               functions,
-               classes,
+        RETURN f.path AS file_path, 
+               coalesce(f.language, 'text') AS language, 
+               functions, 
+               classes, 
                matched_tags
         LIMIT $limit
         """
-
         try:
             with driver.session() as session:
                 records = session.run(query, keywords=keywords, limit=limit)
@@ -140,23 +147,22 @@ class KnowledgeGraphLinker:
                         d = record
                     else:
                         continue
-                    
+
                     file_path = d.get("file_path")
                     if file_path and file_path not in result_data["files"]:
                         result_data["files"].append(file_path)
-                    
+
                     for fn in d.get("functions", []):
                         if fn and fn not in result_data["functions"]:
                             result_data["functions"].append(fn)
-                            
+
                     for cls in d.get("classes", []):
                         if cls and cls not in result_data["classes"]:
                             result_data["classes"].append(cls)
-                            
+
                     for tag in d.get("matched_tags", []):
                         if tag and tag not in result_data["related_tags"]:
                             result_data["related_tags"].append(tag)
         except Exception as e:
             logger.error(f"Failed to retrieve graph context: {e}")
-
         return result_data

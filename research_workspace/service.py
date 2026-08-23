@@ -1,27 +1,17 @@
-# service.py
-
-import asyncio
+import time
 import random
-import string
 
-class UnimatrixService:
-    async def health_check(self):
-        return {"status": "healthy"}
+class AsciiArt:
+    def __init__(self):
+        self.ascii_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?/`~"
 
-    def log_event(self, message):
-        log_line = ''.join(random.choices(string.ascii_letters + string.digits, k=100))
-        print(log_line)
-
-# main.py
-
-from service import UnimatrixService
-
-async def main():
-    service = UnimatrixService()
-    status = await service.health_check()
-    print(status)
-    service.log_event("Service started")
+    def print_ascii_art(self):
+        while True:
+            for char in self.ascii_chars:
+                print(char, end='', flush=True)
+                time.sleep(0.1)
+            print()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    art = AsciiArt()
+    art.print_ascii_art()
