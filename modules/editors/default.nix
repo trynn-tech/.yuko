@@ -44,7 +44,14 @@ in
       relativenumber = true;
       termguicolors = true;
       undofile = true;
-      conceallevel = 2;
+      conceallevel = 0;
+
+      # AUTOMATIC TREESITTER FOLDING CONFIGURATION
+      foldmethod = "expr";
+      foldexpr = "v:lua.vim.treesitter.foldexpr()";
+      foldlevel = 99;         # Keeps folds open by default on file open
+      foldlevelstart = 99;    # Ensures files don't start entirely collapsed
+      foldenable = true;      # Enables the folding framework
     };
 
     plugins = {
@@ -62,13 +69,14 @@ in
     extraPlugins = with pkgs.vimPlugins; [ vimwiki taskwiki vim-plugin-AnsiEsc ];
     extraPackages = with pkgs; [ wl-clipboard xclip taskwarrior3 jq ];
 
+
     extraConfigLua = ''
       local builtin = require('telescope.builtin')
 
       -- fzf find a file buffer
       vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Find Files" })
       -- OIL: Open parent directory as a file buffer
-      vim.keymap.set("n", "<leader>jj", "<cmd>Oil<CR>", { desc = "Open parent directory (Oil)" })
+      vim.keymap.set("n", "<leader>fv", "<cmd>Oil<CR>", { desc = "Open parent directory (Oil)" })
 
       vim.keymap.set("n", "<leader>ww", "<cmd>VimwikiIndex<CR>", { desc = "Wiki Index" })
       vim.keymap.set("n", "<leader>tw", ":call YangSync()<CR>", { desc = "Manual Task Sync" })
@@ -76,17 +84,32 @@ in
       -- UNDOTREE: Toggle undo history tree
       vim.keymap.set("n", "<leader>g", "<cmd>UndotreeToggle<CR>", { desc = "Toggle Undotree" }) 
 
+      -- Toggle Diagnostic Quickfix List
+      local qf_open = false
+      vim.keymap.set("n", "<leader>q", function()
+        if qf_open then
+          vim.cmd("cclose")
+          qf_open = false
+        else
+          vim.diagnostic.setqflist()
+          qf_open = true
+        end
+      end, { desc = "Toggle Quickfix Diagnostics" })
 
-      -- FUNCTION & CONFIG OBJECT JUMPING: Universal symbol navigation for Nix and Python
-      vim.keymap.set("n", "<leader>n", function()
-        builtin.lsp_document_symbols({ 
-          symbols = { 
-            "Function", "Method", "Class",     -- Python
-            "Module", "Struct", "Variable",    -- Nix top-level/attributes
-            "Constant", "Field", "Property"    -- Nix nested config blocks
-          } 
-        })
-      end, { desc = "Jump to function or config object" })
+      -- DYNAMIC FOLD LEVEL KEYMAPS (0-9)
+      for i = 0, 9 do
+        vim.keymap.set("n", "<leader>k" .. i, function()
+          vim.opt.foldlevel = i
+          vim.cmd("normal! zx")
+        end, { desc = "Set foldlevel to " .. i })
+      end
+
+      -- QUICK ACCORDION FLIP
+      vim.keymap.set("n", "<leader><leader>", "za", { desc = "Toggle fold under cursor" })
+
+      -- Swaps to manual mode, selects to the triple newline, and folds it instantly
+vim.keymap.set('n', '<Leader>j', [[:setlocal foldmethod=manual<CR>v/\n\n\n<CR>zf]], { desc = 'Fold text until next triple newline' })
+
 
       -- SECURE CLIPBOARD SYSTEM
       vim.keymap.set("v", "<leader>y", '"+y', { desc = "Secure copy selection to system clipboard" })
@@ -122,6 +145,7 @@ in
         vim.opt.hlsearch = true
       end, { desc = "Toggle purple highlight on selection" })
     '';
+
 
     # TODO: Assign PrettyPrintJsonWorkflows a leader key instead of autocmd [b74263ce-8a1d-4fb1-8bb1-827a21532eb0]
     extraConfigVim = ''

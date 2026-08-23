@@ -7,12 +7,18 @@
     enable = true;
     shell = "${pkgs.zsh}/bin/zsh";
     prefix = "C-Space"; # Sets prefix to Ctrl+Space
+
     # Upgrade terminal to xterm-256color to fully support advanced color definitions
     terminal = "xterm-256color";
     mouse = true;
     keyMode = "vi";
     historyLimit = 100000;
     clock24 = true;
+
+    plugins = with pkgs.tmuxPlugins; [
+      vim-tmux-navigator
+    ];
+
     extraConfig = ''
       # Force Tmux to use vi keys natively in copy mode
       setw -g mode-keys vi
@@ -22,11 +28,23 @@
       set-window-option -g pane-base-index 1
 
       # Split shortcuts
-      bind | split-window -h
-      bind - split-window -v
+      bind b split-window -h
+      bind u split-window -v
 
       # Reload config with visual debug output
       bind r source-file ~/.tmux.conf \; display-message "🔥 YUKO TMUX CONFIG RELOADED SUCCESSFULLY! 🔥"
+
+      # =====================================================================
+      # VIM PANE RESIZING & CLEAR SCREEN OVERRIDE
+      # =====================================================================
+      # Resize panes with Prefix + Shift + h/j/k/l (repeatable)
+      bind -r H resize-pane -L 5
+      bind -r J resize-pane -D 5
+      bind -r K resize-pane -U 5
+      bind -r L resize-pane -R 5
+
+      # Clear screen override (since Ctrl+L is swallowed by vim-tmux-navigator)
+      bind C-l send-keys 'C-l'
 
       # =====================================================================
       # THEME & STATUS BAR STYLING (Neon Violet, Mellow Teal, Emerald)
@@ -44,7 +62,7 @@
 
       # Styles the active window text (e.g., [1:nvim])
       set -g window-status-current-format "#[fg=#00af87,bold][#I]"
-      
+
       # Styles the inactive windows (optional, sets them to a muted gray)
       set -g window-status-format "#[fg=#6e6a86][#I]"
 
@@ -57,7 +75,7 @@
       # =====================================================================
       # ERGONOMIC BINDINGS FOR COPY MODE & PROMPT JUMPING
       # =====================================================================
-      bind-key -n C-j copy-mode
+      bind-key -n C-f copy-mode
 
       # =====================================================================
       # MOUSE HOVER SELECTION & AUTOMATIC COPY

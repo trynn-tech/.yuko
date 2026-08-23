@@ -14,13 +14,14 @@
     feh            
     vlc
     wireshark
-    btop
-    ncdu
-    caligula
-    freetube
-    zathura
-    playerctl
-    handy
+    btop # process monitor
+    ncdu # storage management
+    caligula # Image flasher
+    freetube 
+    zathura # E-Book reader with vi controls
+    playerctl # media controls
+    handy # yuko stt
+    scope-tui # audio visualizer
   ];
 
 }

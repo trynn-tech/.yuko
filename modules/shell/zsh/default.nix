@@ -48,6 +48,7 @@ in
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
 	ns = "nh search";
+	yuko = "synth";
       };
 
       initContent = ''
