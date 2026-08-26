@@ -373,12 +373,12 @@ class AnchorPatcher:
             "functions": [],
             "classes": [],
             "imports": [],
+            "symbols": [],
             "complexity_metrics": {
                 "line_count": len(code.splitlines()),
                 "character_count": len(code),
             },
         }
-
         if not code.strip():
             return facts
 
@@ -389,11 +389,11 @@ class AnchorPatcher:
                     if isinstance(node, ast.ClassDef):
                         if node.name not in facts["classes"]:
                             facts["classes"].append(node.name)
-                    elif isinstance(
-                        node, (ast.FunctionDef, ast.AsyncFunctionDef)
-                    ):
+                            facts["symbols"].append(f"class:{node.name}")
+                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         if node.name not in facts["functions"]:
                             facts["functions"].append(node.name)
+                            facts["symbols"].append(f"fn:{node.name}")
                     elif isinstance(node, ast.Import):
                         for alias in node.names:
                             if alias.name not in facts["imports"]:
@@ -401,6 +401,8 @@ class AnchorPatcher:
                     elif isinstance(node, ast.ImportFrom):
                         if node.module and node.module not in facts["imports"]:
                             facts["imports"].append(node.module)
+
+                facts["symbols_modified"] = facts["symbols"]
                 return facts
             except Exception:
                 pass
@@ -432,21 +434,27 @@ class AnchorPatcher:
                             fn_name = name_node.text.decode("utf-8")
                             if fn_name not in facts["functions"]:
                                 facts["functions"].append(fn_name)
+                                facts["symbols"].append(f"fn:{fn_name}")
                     elif node.type in class_types:
-                        name_node = node.child_by_field_name("name")
+                        name_node = node.child_by_field_name("name") or node.child_by_field_name("type")
                         if name_node and name_node.text:
                             cls_name = name_node.text.decode("utf-8")
                             if cls_name not in facts["classes"]:
                                 facts["classes"].append(cls_name)
+                                facts["symbols"].append(f"class:{cls_name}")
                     elif node.type in import_types:
                         imp_text = node.text.decode("utf-8").strip()
                         if imp_text not in facts["imports"]:
                             facts["imports"].append(imp_text)
+
                     for child in node.children:
                         traverse(child)
 
                 traverse(tree.root_node)
+                facts["symbols_modified"] = facts["symbols"]
             except Exception:
                 pass
 
         return facts
+
+

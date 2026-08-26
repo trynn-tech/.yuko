@@ -96,33 +96,68 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
 
     # Payload Specific Analysis
     if payload_type == "EDIT" or "lines_added" in payload:
-        c.print("\n[bold magenta]📝 Edit Analysis:[/bold magenta]")
+        c.print("\n[bold magenta]📝 Edit Analysis & Diff Metrics:[/bold magenta]")
         lines_added = payload.get("lines_added", 0)
         lines_removed = payload.get("lines_removed", 0)
-        symbols = ast_facts.get("symbols_modified", ast_facts.get("symbols", []))
+        orig_lines = payload.get("original_line_count", 0)
+        upd_lines = payload.get("updated_line_count", 0)
+        
+        # Extract AST symbols
+        functions = ast_facts.get("functions", [])
+        classes = ast_facts.get("classes", [])
+        symbols = []
+        if classes:
+            symbols.extend([f"[cyan]class:{c}[/cyan]" for c in classes])
+        if functions:
+            symbols.extend([f"[blue]fn:{f}[/blue]" for f in functions])
+        if not symbols:
+            symbols = [ast_facts.get("symbols_modified", "None")]
 
-        edit_table = Table(show_header=True, header_style="bold blue")
-        edit_table.add_column("Lines Added")
-        edit_table.add_column("Lines Removed")
-        edit_table.add_column("AST Symbols")
+        edit_table = Table(show_header=True, header_style="bold magenta", expand=True)
+        edit_table.add_column("Metric", style="bold white", width=20)
+        edit_table.add_column("Details / Diff", style="dim white")
+
         edit_table.add_row(
-            f"[green]+{lines_added}[/green]",
-            f"[red]-{lines_removed}[/red]",
-            ", ".join(symbols) if symbols else "None",
+            "Line Changes",
+            f"[green]+{lines_added}[/green] added, [red]-{lines_removed}[/red] removed",
         )
+        edit_table.add_row(
+            "Line Bounds",
+            f"Start: [yellow]1[/yellow]  |  End: [yellow]{upd_lines}[/yellow] (Original total: {orig_lines})",
+        )
+        edit_table.add_row(
+            "AST Symbols",
+            ", ".join(symbols) if isinstance(symbols, list) and symbols else "None",
+        )
+
         c.print(edit_table)
 
     elif payload_type == "CREATE" or "created_content" in payload:
         c.print("\n[bold green]✨ File Creation Details:[/bold green]")
-        create_table = Table(show_header=True, header_style="bold green")
-        create_table.add_column("Total Lines")
-        create_table.add_column("File Size (Bytes)")
-        create_table.add_column("AST Symbols")
+        
+        lines = payload.get("total_lines_created", payload.get("line_count", 0))
+        num_bytes = payload.get("file_bytes", payload.get("byte_size", 0))
+        
+        functions = ast_facts.get("functions", [])
+        classes = ast_facts.get("classes", [])
+        symbols = []
+        if classes:
+            symbols.extend([f"[cyan]class:{cls_item}[/cyan]" for cls_item in classes])
+        if functions:
+            symbols.extend([f"[blue]fn:{fn_item}[/blue]" for fn_item in functions])
+
+        create_table = Table(show_header=True, header_style="bold green", expand=True)
+        create_table.add_column("Property", style="bold white", width=20)
+        create_table.add_column("Value", style="dim white")
+
+        create_table.add_row("Total Lines", f"[bold yellow]{lines}[/bold yellow]")
+        create_table.add_row("File Size", f"{num_bytes} bytes")
+        create_table.add_row("Line Range", f"1 ➔ {lines}")
         create_table.add_row(
-            str(payload.get("line_count", 0)),
-            str(payload.get("byte_size", 0)),
-            ", ".join(ast_facts.get("symbols", [])) or "None",
+            "AST Symbols",
+            ", ".join(symbols) if symbols else "None",
         )
+
         c.print(create_table)
 
     # Code Display (Fallback chain across payload variations)
@@ -134,7 +169,6 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
         or data.get("raw_response")
         or data.get("code")
     )
-
     if code_payload:
         clean_code = str(code_payload).strip()
         if clean_code.startswith("```"):
@@ -144,7 +178,6 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
             if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
             clean_code = "\n".join(lines).strip()
-
         syntax_lang = "python" if lang in ("text", "", None) else lang
         syntax = Syntax(
             clean_code[:2000],
@@ -161,5 +194,4 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
                 expand=True,
             )
         )
-
     c.print("-" * columns)
