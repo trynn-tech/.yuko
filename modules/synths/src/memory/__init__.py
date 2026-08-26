@@ -1,15 +1,26 @@
-# memory/__init__.py
-"""Memory subpackage for state persistence, working memory frame pipelines,
-and Redis vector/cognition stores."""
-
-from .redis_cog import RedisCognitionStore
-from .redis_store import HAS_REDISEARCH, RedisMemoryStore
-from .working_memory import ThoughtFrame, WorkingMemoryPipeline
+# src/memory/__init__.py
+from .render import render_thought_frame
+from .schemas import (
+    CreationPayload,
+    EditPayload,
+    LineDiff,
+    ThoughtFrame,
+)
+from .redis_store import RedisMemoryStore
+from .thoughtframe_collection import (
+    ThoughtFrameCollection,
+    ThoughtFrameFactory,
+)
+from .working_memory import WorkingMemoryPipeline
 
 __all__ = [
-    "HAS_REDISEARCH",
-    "RedisCognitionStore",
-    "RedisMemoryStore",
+    "LineDiff",
+    "EditPayload",
+    "CreationPayload",
     "ThoughtFrame",
+    "ThoughtFrameFactory",
+    "ThoughtFrameCollection",
+    "RedisMemoryStore",
     "WorkingMemoryPipeline",
+    "render_thought_frame",
 ]

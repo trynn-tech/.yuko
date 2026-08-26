@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 # modules/synths/src/engine/executor.py
+import ast
 import difflib
+import logging
+import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -8,7 +12,6 @@ from typing import Any, Optional, Tuple
 
 import git
 from rich.console import Console
-
 from engine.anchor_patch import AnchorPatcher
 from engine.context import RepoContext
 
@@ -24,6 +27,7 @@ class Executor:
 
     def __init__(self, repo_path: Optional[Path] = None):
         self.repo_path = (repo_path or Path.cwd()).resolve()
+        self.patcher = AnchorPatcher()
         self.has_sd = shutil.which("sd") is not None
         self.has_git = shutil.which("git") is not None
         try:
@@ -31,12 +35,42 @@ class Executor:
         except git.InvalidGitRepositoryError:
             self.repo = None
 
-    def run_edit_pass(self, *args: Any, **kwargs: Any) -> bool:        patcher = AnchorPatcher()
+    def _clean_content_payload(self, content: str) -> str:
+        """Strips markdown code block backticks/fences while maintaining target string structure."""
+        if not content:
+            return ""
 
+        # Record whether original content intended a trailing newline
+        had_trailing_newline = content.endswith("\n")
+
+        cleaned = content.strip()
+
+        # Remove opening markdown code fences (e.g. ```python, ```bash, ```)
+        cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\n?", "", cleaned)
+        # Remove closing markdown code fences
+        cleaned = re.sub(r"\n?```$", "", cleaned)
+
+        # Filter isolated fence lines
+        lines = cleaned.splitlines()
+        filtered_lines = [
+            line for line in lines if not line.strip().startswith("```")
+        ]
+        cleaned = "\n".join(filtered_lines)
+
+        # Only append terminating newline if the original string explicitly had one
+        return cleaned + "\n" if had_trailing_newline else cleaned
+
+    def run_edit_pass(self, *args: Any, **kwargs: Any) -> bool:
+        """
+        Executes an edit pass across multiple call signatures:
+        - Exact tuple positional args: (filepath, search_anchor, replace_block)
+        - Keyword arguments: filepath=..., replace=...
+        - Object/dict/raw string payloads passed via args[0] or step=...
+        """
         if len(args) >= 3:
             return self.apply_anchor_edit(str(args[0]), str(args[1]), str(args[2]))
 
-        if "filepath" in kwargs and "replace" in kwargs:
+        if "filepath" in kwargs and ("replace" in kwargs or "replace_block" in kwargs):
             return self.apply_anchor_edit(
                 kwargs.get("filepath", ""),
                 kwargs.get("search_anchor", kwargs.get("search", "")),
@@ -44,41 +78,59 @@ class Executor:
             )
 
         arg = args[0] if args else kwargs.get("step", kwargs.get("payload", None))
-        if arg is not None:
-            if hasattr(arg, "target_file") or (isinstance(arg, dict) and "target_file" in arg):
-                if isinstance(arg, dict):
-                    fpath = arg.get("target_file", "")
-                    search = arg.get("search", "")
-                    replace = arg.get("replace", "")
-                    desc = arg.get("description", "")
+        if arg is None:
+            return False
+
+        # 1. Object or Dict payloads (Step, DummyStep, or dict)
+        is_dict = isinstance(arg, dict)
+        has_obj_attr = any(
+            hasattr(arg, attr)
+            for attr in ("target_file", "filepath", "target", "search_anchor", "search", "replace_block", "replace", "code")
+        )
+
+        if is_dict or (has_obj_attr and not isinstance(arg, str)):
+            if is_dict:
+                fpath = arg.get("filepath", arg.get("target_file", arg.get("target", "")))
+                search = arg.get("search_anchor", arg.get("search", ""))
+                replace = arg.get("replace_block", arg.get("replace", arg.get("code", "")))
+                desc = arg.get("description", "")
+            else:
+                fpath = getattr(arg, "filepath", getattr(arg, "target_file", getattr(arg, "target", "")))
+                search = getattr(arg, "search_anchor", getattr(arg, "search", ""))
+                replace = getattr(arg, "replace_block", getattr(arg, "replace", getattr(arg, "code", "")))
+                desc = getattr(arg, "description", "")
+
+            if not replace and desc:
+                replace = f"# {desc}\n"
+
+            return self.apply_anchor_edit(str(fpath), str(search), str(replace))
+
+        # 2. Raw String Block Payloads (LLM generated string outputs)
+        if isinstance(arg, str):
+            fallback = kwargs.get("fallback_filepath", "")
+            blocks = self.patcher.parse_blocks(arg, fallback)
+            if not blocks:
+                target = Path(fallback or "generated.py")
+                if not target.is_absolute():
+                    target = (self.repo_path / target).resolve()
+                return self._create_file(target, arg)
+
+            success_all = True
+            for block in blocks:
+                if block.search_anchor:
+                    res = self.apply_anchor_edit(
+                        block.filepath, block.search_anchor, block.replace_block
+                    )
                 else:
-                    fpath = getattr(arg, "target_file", "")
-                    search = getattr(arg, "search", "")
-                    replace = getattr(arg, "replace", "")
-                    desc = getattr(arg, "description", "")
-                if not replace and desc:
-                    replace = f"# {desc}\n"
-                return self.apply_anchor_edit(fpath, search, replace)
-            elif isinstance(arg, str):
-                fallback = kwargs.get("fallback_filepath", "")
-                blocks = patcher.parse_blocks(arg, fallback)
-                if not blocks:
-                    target = Path(fallback or "generated.py")
+                    target = Path(block.filepath)
                     if not target.is_absolute():
                         target = (self.repo_path / target).resolve()
-                    return self._create_file(target, arg)
-                success_all = True
-                for block in blocks:
-                    if block.search_anchor:
-                        res = self.apply_anchor_edit(block.filepath, block.search_anchor, block.replace_block)
-                    else:
-                        target = Path(block.filepath)
-                        if not target.is_absolute():
-                            target = (self.repo_path / target).resolve()
-                        res = self._create_file(target, block.replace_block)
-                    if not res:
-                        success_all = False
-                return success_all
+                    res = self._create_file(target, block.replace_block)
+
+                if not res:
+                    success_all = False
+            return success_all
+
         return False
 
     def apply_anchor_edit(
@@ -89,6 +141,7 @@ class Executor:
     ) -> bool:
         context_finder = RepoContext(root_path=self.repo_path)
         target_file = Path(filepath)
+
         if not target_file.is_absolute():
             target_file = (self.repo_path / target_file).resolve()
 
@@ -108,18 +161,21 @@ class Executor:
                 )
                 target_file = found_path
 
+        replace_block = self._clean_content_payload(replace_block)
         was_created = not target_file.exists()
+
         if was_created or not search_anchor.strip():
             return self._create_file(target_file, replace_block)
 
         try:
             original_content = target_file.read_text(encoding="utf-8")
         except Exception as e:
-            console.print(f"[red]Failed to read target file {target_file.name}:[/red] {e}")
+            console.print(
+                f"[red]Failed to read target file {target_file.name}:[/red] {e}"
+            )
             return False
 
         stash_created = self._git_checkpoint(target_file)
-
         norm_search = search_anchor.replace("\r\n", "\n")
         norm_replace = replace_block.replace("\r\n", "\n")
         norm_content = original_content.replace("\r\n", "\n")
@@ -147,14 +203,78 @@ class Executor:
                     f"[Lines {line_bounds[0]}-{line_bounds[1]}][/green]"
                 )
             else:
-                console.print(f"[green]Successfully patched {target_file.name}[/green]")
+                console.print(
+                    f"[green]Successfully patched {target_file.name}[/green]"
+                )
             return True
         else:
             console.print(
                 f"[red]Failed to apply patch to {target_file.name}. Rolling back changes...[/red]"
             )
-            self._rollback(target_file, original_content, was_created, stash_created)
+            self._rollback(
+                target_file, original_content, was_created, stash_created
+            )
             return False
+
+    def apply_symbolic_edit(
+        self, filepath: str, symbol_type: str, symbol_name: str, replace_content: str
+    ) -> bool:
+        """Deterministically manages symbolic items (like imports or functions) with scope awareness."""
+        target_file = Path(filepath)
+        if not target_file.is_absolute():
+            target_file = (self.repo_path / target_file).resolve()
+
+        if not target_file.exists():
+            console.print(
+                f"[red]Target file {target_file.name} does not exist for symbolic edit.[/red]"
+            )
+            return False
+
+        try:
+            content = target_file.read_text(encoding="utf-8")
+        except Exception as e:
+            console.print(f"[red]Failed to read {target_file.name}:[/red] {e}")
+            return False
+
+        lines = content.splitlines()
+        success = False
+        replace_content = self._clean_content_payload(replace_content).strip()
+
+        if symbol_type == "import":
+            escaped_symbol = re.escape(symbol_name)
+            import_pattern = re.compile(
+                rf"^\s*(?:import\s+{escaped_symbol}|from\s+\S+\s+import\s+.*{escaped_symbol})"
+            )
+            exists = any(import_pattern.match(l) for l in lines)
+
+            if exists:
+                new_lines = [
+                    replace_content if import_pattern.match(l) else l for l in lines
+                ]
+                success = True
+            else:
+                insert_idx = 0
+                for idx, line in enumerate(lines):
+                    stripped = line.strip()
+                    if stripped.startswith(("import ", "from ", "#")) or (
+                        stripped.startswith(('"', "'")) and idx < 5
+                    ):
+                        insert_idx = idx + 1
+                    elif stripped and not stripped.startswith(('"', "'")):
+                        break
+
+                lines.insert(insert_idx, replace_content)
+                new_lines = lines
+                success = True
+
+            if success:
+                new_content = "\n".join(new_lines) + "\n"
+                console.print(
+                    f"[green]Successfully synchronized symbolic import '{symbol_name}' in {target_file.name}[/green]"
+                )
+                return self._write_file_safe(target_file, new_content)
+
+        return False
 
     def _apply_via_sd(self, target_file: Path, search: str, replace: str) -> bool:
         try:
@@ -177,66 +297,42 @@ class Executor:
     def _apply_fuzzy_splice(
         self, target_file: Path, content: str, search: str, replace: str
     ) -> Tuple[bool, Optional[Tuple[int, int]]]:
-        """
-        Performs flexible line-based splicing using exact stripped-line matching
-        followed by difflib sequence matching, preserving line indentation.
-        """
-        search_lines = [l for l in search.splitlines() if l.strip()]
-        if not search_lines:
-            return False, None
-
-        file_lines = content.splitlines(keepends=True)
-        stripped_file = [l.strip() for l in file_lines]
-        stripped_search = [l.strip() for l in search_lines]
-
-        match_start, match_end = -1, -1
-
-        # Pass 1: Exact stripped line sliding window
-        window_size = len(stripped_search)
-        for i in range(len(stripped_file) - window_size + 1):
-            if stripped_file[i : i + window_size] == stripped_search:
-                match_start = i
-                match_end = i + window_size
-                break
-
-        # Pass 2: Fuzzy sequence matcher for partial/imperfect anchor blocks
-        if match_start == -1 and len(stripped_file) >= window_size:
-            best_ratio = 0.75  # Threshold minimum cutoff
-            for i in range(len(stripped_file) - window_size + 1):
-                window = stripped_file[i : i + window_size]
-                ratio = difflib.SequenceMatcher(None, window, stripped_search).ratio()
-                if ratio > best_ratio:
-                    best_ratio = ratio
-                    match_start = i
-                    match_end = i + window_size
-
-        if match_start != -1:
-            # Infer indent prefix from first matched line
-            first_line = file_lines[match_start]
+        # Delegate fuzzy matching to AnchorPatcher first
+        match = self.patcher.locate_fuzzy_anchor(content, search)
+        if match:
+            start_line, end_line, _ = match
+            file_lines = content.splitlines(keepends=True)
+            first_line = file_lines[start_line]
             indent_prefix = first_line[: len(first_line) - len(first_line.lstrip())]
 
             replace_lines = replace.splitlines()
-            formatted_replacement = []
-            for line in replace_lines:
-                if line.strip():
-                    formatted_replacement.append(f"{indent_prefix}{line.strip()}\n")
-                else:
-                    formatted_replacement.append("\n")
+            formatted_replacement = [
+                f"{indent_prefix}{l.strip()}\n" if l.strip() else "\n"
+                for l in replace_lines
+            ]
 
             new_lines = (
-                file_lines[:match_start]
+                file_lines[:start_line]
                 + formatted_replacement
-                + file_lines[match_end:]
+                + file_lines[end_line:]
             )
             write_ok = self._write_file_safe(target_file, "".join(new_lines))
-            return write_ok, (match_start + 1, match_end)
+            return write_ok, (start_line + 1, end_line)
 
         return False, None
+
+    def write_file(self, filepath: str, content: str) -> bool:
+        """Public alias for file creation and safe writing."""
+        target = Path(filepath)
+        if not target.is_absolute():
+            target = (self.repo_path / target).resolve()
+        return self._create_file(target, content)
 
     def _create_file(self, target_file: Path, content: str) -> bool:
         try:
             target_file.parent.mkdir(parents=True, exist_ok=True)
-            if self._write_file_safe(target_file, content):
+            cleaned = self._clean_content_payload(content)
+            if self._write_file_safe(target_file, cleaned):
                 if self.repo:
                     try:
                         self.repo.git.add(str(target_file))
@@ -251,7 +347,8 @@ class Executor:
     def _write_file_safe(self, target_file: Path, content: str) -> bool:
         try:
             target_file.parent.mkdir(parents=True, exist_ok=True)
-            target_file.write_text(content, encoding="utf-8")
+            cleaned = self._clean_content_payload(content)
+            target_file.write_text(cleaned, encoding="utf-8")
             return True
         except (PermissionError, OSError) as e:
             console.print(f"[red]Write failed for {target_file.name}:[/red] {e}")
@@ -260,7 +357,8 @@ class Executor:
     def _git_checkpoint(self, target_file: Path) -> bool:
         if not self.repo:
             return False
-        try:            rel_path = str(target_file.relative_to(self.repo_path))
+        try:
+            rel_path = str(target_file.relative_to(self.repo_path))
             return rel_path in self.repo.untracked_files or self.repo.is_dirty(
                 path=rel_path
             )

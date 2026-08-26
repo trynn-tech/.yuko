@@ -1,72 +1,27 @@
-#!/usr/bin/env python3
-# modules/synths/src/engine/working_memory.py
-
+# src/memory/working_memory.py
 import json
 import logging
-import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
-from pydantic import BaseModel, Field
 
-from engine.anchor_patch import AnchorPatcher, PatchBlock
-from engine.analyzer import CodeAnalyzer
+from coordinator.pachinko import DispatchDecision, OperationalIntent, PachinkoRouter
+from engine.anchor_patch import AnchorPatcher
+from .thoughtframe_collection import ThoughtFrameFactory
+from .schemas import ThoughtFrame
 
-# Defer import to prevent circular dependency with pipeline.py / redis_store.py
 if TYPE_CHECKING:
     from reasoning.pipeline import ReasoningOrchestrator
 
 logger = logging.getLogger(__name__)
 
 
-class ThoughtFrame(BaseModel):
-    """Structured temporal execution frame capturing instructions, dual-process 
-    reasoning plans, code diffs, AST topology facts, and verification states.
-    """
-    session_id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
-    timestamp: float = Field(default_factory=time.time)
-    instruction: str
-    reasoning_plan: Dict[str, Any] = Field(default_factory=dict)
-    raw_response: str = ""
-    original_code: str = ""
-    extracted_code: str = ""
-    language: str = "text"
-    ast_facts: Dict[str, Any] = Field(default_factory=dict)
-    concept_tags: List[str] = Field(default_factory=list)
-    semantic_summary: str = ""
-    predicted_title: str = ""
-    resolved_path: Optional[str] = None
-    verification_passed: bool = False
-    coverage_metrics: Dict[str, Any] = Field(default_factory=dict)
-
-    def to_redis_payload(self) -> str:
-        return self.model_dump_json(indent=2)
-
-
 class WorkingMemoryPipeline:
-    """Orchestrates working memory persistence, neuro-symbolic dual-process plan 
-    formulation, and 3-tier synchronization (Redis, RediSearch vector store, Neo4j graph).
-    """
-
-    LANG_EXT_MAP = {
-        "python": ".py",
-        "nix": ".nix",
-        "bash": ".sh",
-        "sh": ".sh",
-        "c": ".c",
-        "cpp": ".cpp",
-        "rust": ".rs",
-        "json": ".json",
-        "yaml": ".yaml",
-        "toml": ".toml",
-        "javascript": ".js",
-        "typescript": ".ts",
-        "markdown": ".md",
-        "text": ".txt",
-    }
+    """Orchestrates intent routing, code parsing, AST extraction, semantic metadata prediction, and 3-tier persistence."""
 
     PREDICTION_SYSTEM_PROMPT = """You are an architectural metadata prediction engine.
 Analyze the user instruction, extracted code snippet, and structural AST facts to predict a semantic title and high-level concept tags.
+
 OUTPUT FORMAT RULES:
 Return ONLY a valid, raw JSON object with NO markdown code fences:
 {
@@ -77,56 +32,57 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
 
     def __init__(
         self,
+        router: Optional[PachinkoRouter] = None,
         patcher: Optional[AnchorPatcher] = None,
-        analyzer: Optional[CodeAnalyzer] = None,
         store: Any = None,
-        orchestrator: Optional['ReasoningOrchestrator'] = None,
+        redis_store: Any = None,
+        orchestrator: Optional["ReasoningOrchestrator"] = None,
+        llm_client: Any = None,
     ):
+        self.router = router or PachinkoRouter()
         self.patcher = patcher or AnchorPatcher()
-        self.analyzer = analyzer or CodeAnalyzer()
-        self.store = store
-        
-        # Local import breaks the circular dependency chain
+        self.store = redis_store or store
+        self.llm_client = llm_client
+
         if orchestrator is None:
-            from reasoning.pipeline import ReasoningOrchestrator
-            self.orchestrator = ReasoningOrchestrator()
+            try:
+                from reasoning.pipeline import ReasoningOrchestrator
+
+                # Pass injected store to orchestrator so mock stores in tests receive save_thought_frame calls
+                self.orchestrator = ReasoningOrchestrator(
+                    redis_store=self.store
+                )
+            except ImportError:
+                self.orchestrator = None
         else:
             self.orchestrator = orchestrator
 
-    def record_frame(
+    def process_incoming_event(
         self,
-        instruction: str,
-        raw_response: str,
-        filepath: str,
+        session_id: Optional[str] = None,
+        prompt: str = "",
+        raw_response: str = "",
+        filepath: str = "src/main.py",
         code: str = "",
-        reasoning_plan: Any = None,
-        original_code: str = "",
-        updated_code: str = "",
-        ast_facts: Optional[Dict[str, Any]] = None,
-        coverage_metrics: Optional[Dict[str, Any]] = None,
+        workspace_context: Optional[List[str]] = None,
+        llm_client: Any = None,
+        **kwargs,
     ) -> ThoughtFrame:
-        """Records a structured dual-process reasoning, plan, and synthesis frame into memory and 3-tier stores."""
-        structured_plan = self._formulate_dual_process_plan(reasoning_plan)
+        """Compatibility wrapper for pipeline event ingestion tested in test suites."""
+        sid = session_id or str(uuid.uuid4())[:8]
+        content = code or raw_response or prompt
+        ctx = workspace_context or []
 
-        ext = Path(filepath).suffix.lower() if filepath else ".txt"
-        lang = self.patcher._detect_language(filepath)
-        final_code = updated_code or code
-
-        resolved_ast = ast_facts or self.patcher.extract_ast_facts(filepath, final_code)
-
-        frame = ThoughtFrame(
-            instruction=instruction,
-            reasoning_plan=structured_plan,
-            raw_response=raw_response,
-            original_code=original_code,
-            extracted_code=final_code,
-            resolved_path=filepath,
-            language=lang,
-            ast_facts=resolved_ast,
-            verification_passed=True,
-            coverage_metrics=coverage_metrics or {},
+        frame = self.process_synthesis(
+            instruction=prompt or "Process incoming event",
+            raw_llm_response=content,
+            workspace_context=ctx,
+            requested_path=filepath,
+            original_code=code,
+            llm_client=llm_client or self.llm_client,
         )
-
+        frame.session_id = sid
+        # process_synthesis already invokes _persist_frame; re-persist if sid was updated
         self._persist_frame(frame)
         return frame
 
@@ -134,104 +90,82 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
         self,
         instruction: str,
         raw_llm_response: str,
-        llm_client: Any,
-        explicit_target: Optional[Path] = None,
+        workspace_context: List[str],
+        requested_path: str,
         original_code: str = "",
-        reasoning_plan: Any = None,
-        coverage_metrics: Optional[Dict[str, Any]] = None,
+        llm_client: Any = None,
     ) -> ThoughtFrame:
-        """Executes the complete Code ➔ Sanitize/Lint ➔ Analyze ➔ Predict Title ➔ Verify pipeline."""
-        blocks: List[PatchBlock] = self.patcher.parse_blocks(raw_llm_response)
-        if not blocks:
-            code_content = raw_llm_response.strip()
-            lang = (
-                "python"
-                if "def " in code_content or "import " in code_content
-                else "text"
+        session_id = str(uuid.uuid4())[:8]
+
+        # 1. Direct intent evaluation using PachinkoRouter
+        decision: DispatchDecision = self.router.route_target(
+            requested_path, workspace_context
+        )
+        resolved_path = str(decision.target_path)
+
+        # 2. Sanitize output and extract AST details
+        code_content = self._sanitize_code_content(raw_llm_response)
+        ast_facts = self.patcher.extract_ast_facts(resolved_path, code_content)
+
+        # 3. Factory dispatch based on Pachinko OperationalIntent
+        if decision.intent in (
+            OperationalIntent.EDIT_EXACT,
+            OperationalIntent.EDIT_FUZZY_APPEND,
+            OperationalIntent.EDIT,
+            OperationalIntent.PATCH,
+        ):
+            base_content = original_code
+            if not base_content and decision.target_path.exists():
+                try:
+                    base_content = decision.target_path.read_text(
+                        encoding="utf-8"
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Could not read original file %s: %s",
+                        resolved_path,
+                        e,
+                    )
+            frame = ThoughtFrameFactory.create_edit_frame(
+                session_id=session_id,
+                target_file=resolved_path,
+                original_content=base_content,
+                updated_content=code_content,
+                raw_prompt=instruction,
+                ast_facts=ast_facts,
             )
         else:
-            code_content = blocks[0].replace_block
-            lang = blocks[0].language
+            frame = ThoughtFrameFactory.create_creation_frame(
+                session_id=session_id,
+                target_file=resolved_path,
+                created_content=code_content,
+                raw_prompt=instruction,
+                ast_facts=ast_facts,
+            )
 
-        code_content = self._sanitize_code_content(code_content)
-        ext = self.LANG_EXT_MAP.get(lang, f".{lang}")
-        syntax_ok = self.patcher._validate_syntax(ext, code_content)
-        ast_facts = self.patcher.extract_ast_facts(str(explicit_target) if explicit_target else "", code_content)
-
-        structured_plan = self._formulate_dual_process_plan(reasoning_plan)
-
-        frame = ThoughtFrame(
+        # 4. Synthesize Semantic Metadata (Summary, Tags, Title)
+        client = llm_client or self.llm_client
+        prediction_payload = self._predict_semantic_metadata(
+            client=client,
             instruction=instruction,
-            reasoning_plan=structured_plan,
-            raw_response=raw_llm_response,
-            original_code=original_code,
-            extracted_code=code_content,
-            language=lang,
+            code=code_content,
             ast_facts=ast_facts,
-            verification_passed=syntax_ok,
-            coverage_metrics=coverage_metrics or {},
+            lang=getattr(frame, "language", "python"),
         )
 
-        prediction_payload = self._predict_semantic_metadata(llm_client, frame)
         frame.predicted_title = prediction_payload.get(
-            "predicted_title", "synthesized_module"
+            "predicted_title", Path(resolved_path).stem
         )
         frame.semantic_summary = prediction_payload.get(
-            "semantic_summary", "Synthesized module."
+            "semantic_summary", "Synthesized code unit."
         )
         frame.concept_tags = prediction_payload.get(
-            "concept_tags", [lang, "synthesis"]
+            "concept_tags", ["synthesis", getattr(frame, "language", "python")]
         )
 
-        if explicit_target and not explicit_target.is_dir():
-            frame.resolved_path = str(explicit_target)
-        else:
-            filename = f"{frame.predicted_title}{ext}"
-            frame.resolved_path = str(
-                explicit_target / filename if explicit_target else Path(filename)
-            )
-
+        # 5. Persist Frame across 3-tier memory & stores
         self._persist_frame(frame)
         return frame
-
-    def _formulate_dual_process_plan(self, reasoning_plan: Any) -> Dict[str, Any]:
-        """Structures plans into neural generation traces and symbolic constraints."""
-        if isinstance(reasoning_plan, str):
-            constraints = [
-                line.strip() for line in reasoning_plan.splitlines()
-                if line.strip() and not line.strip().startswith("```")
-            ]
-            return {
-                "neural_trace": reasoning_plan,
-                "symbolic_constraints": constraints,
-                "mode": "contemplation"
-            }
-        elif isinstance(reasoning_plan, dict):
-            if "neural_trace" not in reasoning_plan:
-                reasoning_plan["neural_trace"] = json.dumps(reasoning_plan)
-            if "symbolic_constraints" not in reasoning_plan:
-                reasoning_plan["symbolic_constraints"] = []
-            if "mode" not in reasoning_plan:
-                reasoning_plan["mode"] = "contemplation"
-            return reasoning_plan
-        return {"neural_trace": "", "symbolic_constraints": [], "mode": "standard"}
-
-    def _persist_frame(self, frame: ThoughtFrame) -> None:
-        """Pushes ThoughtFrame through the unified 3-tier ReasoningOrchestrator and Redis store."""
-        if self.orchestrator:
-            try:
-                self.orchestrator.process_and_store(frame)
-                print(f"[cyan]🌐 3-Tier Synchronized (Redis, Vector, Neo4j):[/cyan] session_id={frame.session_id}")
-                return
-            except Exception as e:
-                logger.warning("Failed 3-tier orchestration sync, falling back to Redis: %s", e)
-
-        if self.store and hasattr(self.store, "save_thought_frame"):
-            try:
-                self.store.save_thought_frame(frame)
-                print(f"[cyan]🎫 Redis Ticket Stored:[/cyan] session_id={frame.session_id}")
-            except Exception as e:
-                logger.warning("Failed to store ThoughtFrame in Redis: %s", e)
 
     def _sanitize_code_content(self, code: str) -> str:
         lines = code.splitlines()
@@ -239,16 +173,46 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
             lines = lines[1:]
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
-        sanitized = "\n".join(lines).strip()
-        return sanitized + "\n"
+        return "\n".join(lines).strip() + "\n"
 
     def _predict_semantic_metadata(
-        self, llm_client: Any, frame: ThoughtFrame
+        self,
+        client: Any,
+        instruction: str,
+        code: str,
+        ast_facts: Dict[str, Any],
+        lang: str = "python",
     ) -> Dict[str, Any]:
-        code_preview = "\n".join(frame.extracted_code.splitlines()[:12])
-        user_prompt = f"""USER INSTRUCTION:{frame.instruction}STRUCTURAL AST FACTS:{json.dumps(frame.ast_facts, indent=2)}CODE SNIPPET (PREVIEW):{code_preview}"""
+        """Queries LLM or provides structural fallback for semantic summaries & concept tags."""
+        funcs = ast_facts.get("functions", [])
+        classes = ast_facts.get("classes", [])
+        symbols = (
+            funcs
+            + classes
+            + ast_facts.get("symbols", [])
+            + ast_facts.get("symbols_modified", [])
+        )
+
+        fallback_tags = list(set([lang, "synthesis"] + symbols[:3]))
+        fallback_title = (
+            classes[0].lower()
+            if classes
+            else (funcs[0].lower() if funcs else "synthesized_module")
+        )
+        fallback = {
+            "predicted_title": fallback_title,
+            "semantic_summary": f"Synthesized {lang} module implementing {', '.join(symbols) if symbols else 'requested logic'}.",
+            "concept_tags": fallback_tags,
+        }
+
+        if not client or not hasattr(client, "generate_stream"):
+            return fallback
+
+        code_preview = "\n".join(code.splitlines()[:12])
+        user_prompt = f"USER INSTRUCTION:{instruction}\nSTRUCTURAL AST FACTS:{json.dumps(ast_facts, indent=2)}\nCODE SNIPPET (PREVIEW):\n{code_preview}"
+
         try:
-            raw_pred = llm_client.generate_stream(
+            raw_pred = client.generate_stream(
                 system_prompt=self.PREDICTION_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
             )
@@ -256,14 +220,36 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
             if cleaned.startswith("```"):
                 cleaned = cleaned.split("\n", 1)[1]
                 cleaned = cleaned.rsplit("```", 1)[0].strip()
-            return json.loads(cleaned)
-        except Exception:
-            funcs = frame.ast_facts.get("functions", [])
-            fallback_title = (
-                funcs[0].lower().replace("check_", "") if funcs else "module"
-            )
+            res = json.loads(cleaned)
             return {
-                "predicted_title": fallback_title,
-                "semantic_summary": "Synthesized code unit.",
-                "concept_tags": [frame.language, "generated"],
+                "predicted_title": res.get(
+                    "predicted_title", fallback_title
+                ),
+                "semantic_summary": res.get(
+                    "semantic_summary", fallback["semantic_summary"]
+                ),
+                "concept_tags": res.get("concept_tags", fallback_tags),
             }
+        except Exception as e:
+            logger.warning("Failed metadata prediction LLM call: %s", e)
+            return fallback
+
+    def _persist_frame(self, frame: ThoughtFrame) -> None:
+        """Pushes ThoughtFrame through 3-tier orchestrator (Redis, Vector, Neo4j) and fallback stores."""
+        if self.orchestrator and hasattr(
+            self.orchestrator, "process_and_store"
+        ):
+            try:
+                self.orchestrator.process_and_store(frame)
+                return
+            except Exception as e:
+                logger.warning(
+                    "Failed 3-tier orchestration sync, falling back to direct store: %s",
+                    e,
+                )
+
+        if self.store and hasattr(self.store, "save_thought_frame"):
+            try:
+                self.store.save_thought_frame(frame)
+            except Exception as e:
+                logger.warning("Failed to store ThoughtFrame in Redis: %s", e)

@@ -80,16 +80,19 @@ def test_executor_fuzzy_splice_fallback(temp_repo):
     target = temp_repo / "fuzzy.py"
     initial_content = "def setup():\n    pass\n\ndef teardown():\n    pass\n"
     target.write_text(initial_content)
-
+    
     executor = Executor(repo_path=temp_repo)
     executor.has_sd = False
-
+    
     search_anchor = "def teardown():\npass"
     replace_block = "def teardown():\n    print('cleaned')\n    pass"
-
-    success = executor._apply_fuzzy_splice(target, target.read_text(), search_anchor, replace_block)
+    
+    # Corrected: Unpack tuple return (success, line_range) from _apply_fuzzy_splice
+    success, line_range = executor._apply_fuzzy_splice(
+        target, target.read_text(), search_anchor, replace_block
+    )
     assert success is True
-
+    
     new_content = target.read_text()
     assert "print('cleaned')" in new_content
     assert "setup" in new_content
@@ -112,7 +115,7 @@ def test_graph_init_schema(mock_neo4j):
 
     expected_calls = len(linker.SCHEMA_QUERIES) * 2
     actual_calls = mock_session.run.call_count
-    
+
     assert actual_calls == expected_calls, (
         f"Schema initialization run call count mismatch! "
         f"Expected {expected_calls} calls ({len(linker.SCHEMA_QUERIES)} queries * 2), "
@@ -144,7 +147,6 @@ def test_graph_sync_thought_frame(mock_neo4j):
     success = linker.sync_thought_frame_graph(frame_data)
     assert success is True
 
-    # Verify that multi-statement Cypher batch execution successfully merged the CodeFile
     cypher_queries = [call[0][0] for call in mock_session.run.call_args_list]
     assert any("MERGE (f:CodeFile" in q for q in cypher_queries)
 
