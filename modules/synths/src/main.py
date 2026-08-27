@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # src/main.py
+
 import argparse
 import sys
 import time
@@ -10,6 +11,7 @@ from coordinator.architect import ArchitectCoordinator
 from engine.anchor_patch import AnchorPatcher
 from engine.executor import Executor
 from memory import RedisMemoryStore, WorkingMemoryPipeline, render_thought_frame
+from engine.intake import SCRIPT_DELIMITER, ScriptStreamHandler
 
 try:
     from engine.verifier import VerificationHook
@@ -63,6 +65,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Run semi-autonomous Composer mode to execute a multi-step recipe.",
     )
     mode_group.add_argument(
+        "-s",
+        "--script",
+        action="store_true",
+        help="synth -s << 'EOF' =^-.-^= CREATE main.py ```python your code here =^-.-^= EOF",
+    )
+    mode_group.add_argument(
         "-t",
         "--targets",
         nargs="+",
@@ -94,9 +102,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     db_group.add_argument(
         "--memory-step",
-        nargs="?",       # Allows the flag to be passed with or without an explicit integer
-        const=0,         # Value used when --memory-step is passed with NO argument
-        default=None,    # Value used when --memory-step is omitted entirely
+        nargs="?",  # Allows the flag to be passed with or without an explicit integer
+        const=0,  # Value used when --memory-step is passed with NO argument
+        default=None,  # Value used when --memory-step is omitted entirely
         type=int,
         help="Offset step for memory linked-list traversal (defaults to 0 if flag is passed alone)",
     )
@@ -121,6 +129,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable upstream LLM strategy queries during divergence passes.",
     )
+
     return parser
 
 
@@ -155,13 +164,20 @@ def main():
     # 2. Real-Time Stream Watcher
     if args.watch:
         from memory.redis_store import watch_thought_stream
+
         watch_thought_stream(redis_store)
         return
 
     # 3. Database Maintenance & Query Commands
     if args.reset_db:
-        console.print("[bold yellow]🧹 Resetting Reasoning Stores (Redis & Neo4j)...[/bold yellow]")
-        redis_ok = getattr(redis_store, "flush_db", lambda: getattr(redis_store, "clear", lambda: True)())()
+        console.print(
+            "[bold yellow]🧹 Resetting Reasoning Stores (Redis & Neo4j)...[/bold yellow]"
+        )
+        redis_ok = getattr(
+            redis_store,
+            "flush_db",
+            lambda: getattr(redis_store, "clear", lambda: True)(),
+        )()
         neo_ok = graph_linker.flush_graph()
         if redis_ok:
             console.print("  [green]✓ Redis vector store flushed.[/green]")
@@ -174,7 +190,9 @@ def main():
         return
 
     if args.inspect_graph:
-        console.print("[bold cyan]🕸️ Inspecting Neo4j Knowledge Graph...[/bold cyan]")
+        console.print(
+            "[bold cyan]🕸️ Inspecting Neo4j Knowledge Graph...[/bold cyan]"
+        )
         ctx = graph_linker.retrieve_graph_context(keywords=["*"], limit=20)
         console.print(ctx)
         return
@@ -182,15 +200,15 @@ def main():
     if args.memory_query is not None or args.memory_step:
         if args.memory_step is None:
             args.memory_step = 0
-
-        base_head = args.memory_query if args.memory_query is not None else time.time()
+        base_head = (
+            args.memory_query if args.memory_query is not None else time.time()
+        )
         try:
             ts_query = float(base_head)
             frame, raw_idx, total = redis_store.retrieve_nearest_thought_frame(
                 target_timestamp=ts_query,
                 offset_step=args.memory_step,
             )
-
             # Adjust display total scale to total - 1 (0-indexed boundary scale)
             display_total = max(0, total - 1)
 
@@ -203,9 +221,12 @@ def main():
             direction = (
                 "Memory from Least Recently Used"
                 if args.memory_step < 0
-                else ("Memory from Most Recently Used" if args.memory_step > 0 else "head")
+                else (
+                    "Memory from Most Recently Used"
+                    if args.memory_step > 0
+                    else "head"
+                )
             )
-
             console.print(
                 f"[bold cyan]🔍 Memory Linked-List Traversal "
                 f"[Index: {display_idx}/{display_total} | Step: {args.memory_step} ({direction})]:[/bold cyan]"
@@ -214,7 +235,6 @@ def main():
                 render_thought_frame(frame, console_out=console)
             else:
                 console.print("[yellow]No matching ThoughtFrame found.[/yellow]")
-
         except ValueError:
             if args.memory_step != 0:
                 console.print(
@@ -227,17 +247,26 @@ def main():
             if frame:
                 render_thought_frame(frame, console_out=console)
             else:
-                console.print("[yellow]No matching ThoughtFrame found in Redis.[/yellow]")
+                console.print(
+                    "[yellow]No matching ThoughtFrame found in Redis.[/yellow]"
+                )
         return
-
 
     # 4. Engine Self-Test & Coverage Integration (--test)
     if args.test:
-        console.print("[bold cyan]🧪 Running Yuko Synthesizer Engine Self-Test & Coverage Audit...[/bold cyan]")
-        
+        console.print(
+            "[bold cyan]🧪 Running Yuko Synthesizer Engine Self-Test & Coverage Audit...[/bold cyan]"
+        )
+
         if feature_embedder:
-            encoded_vec = feature_embedder.encode("Initialize vector index and persist thought frames")
-            if isinstance(encoded_vec, list) and len(encoded_vec) > 0 and isinstance(encoded_vec[0], list):
+            encoded_vec = feature_embedder.encode(
+                "Initialize vector index and persist thought frames"
+            )
+            if (
+                isinstance(encoded_vec, list)
+                and len(encoded_vec) > 0
+                and isinstance(encoded_vec[0], list)
+            ):
                 dummy_vec: list[float] = [float(x) for x in encoded_vec[0]]
             elif isinstance(encoded_vec, list):
                 dummy_vec = [float(x) for x in encoded_vec]
@@ -246,34 +275,56 @@ def main():
         else:
             dummy_vec = [0.01] * 768
 
-        console.print("[cyan]▶ Testing Neo4j & Redis Multi-File Context Resolution...[/cyan]")
+        console.print(
+            "[cyan]▶ Testing Neo4j & Redis Multi-File Context Resolution...[/cyan]"
+        )
         try:
-            graph_ctx = graph_linker.retrieve_graph_context(keywords=["redis_store"], limit=5)
+            graph_ctx = graph_linker.retrieve_graph_context(
+                keywords=["redis_store"], limit=5
+            )
             redis_hits = redis_store.knn_search(vector=dummy_vec, k=2)
-            console.print("  [green]✓ Neo4j graph query executed successfully.[/green]")
-            console.print(f"  [green]✓ RediSearch KNN hits found:[/green] {len(redis_hits)} vectors")
+            console.print(
+                "  [green]✓ Neo4j graph query executed successfully.[/green]"
+            )
+            console.print(
+                f"  [green]✓ RediSearch KNN hits found:[/green] {len(redis_hits)} vectors"
+            )
         except Exception as e:
             console.print(f"  [yellow]⚠️ 3-Tier context check warning: {e}[/yellow]")
 
-        console.print("\n[cyan]▶ Running Pytest Coverage Suite via VerificationHook...[/cyan]")
+        console.print(
+            "\n[cyan]▶ Running Pytest Coverage Suite via VerificationHook...[/cyan]"
+        )
         if VerificationHook:
             hook = VerificationHook()
             # Pass target_file or main.py as target for coverage reporting metric
-            coverage_results = hook.run_coverage_check(target_file="src/main.py", test_path="tests")
-            
+            coverage_results = hook.run_coverage_check(
+                target_file="src/main.py", test_path="tests"
+            )
+
             if coverage_results.get("tests_passed"):
-                console.print(f"  [green]✔ Pytest suite passed successfully! Coverage: {coverage_results.get('coverage_pct', 0.0):.1f}%[/green]")
-                console.print("\n[bold green]✨ Engine Self-Test & Verification Passed Successfully![/bold green]")
+                console.print(
+                    f"  [green]✔ Pytest suite passed successfully! Coverage: {coverage_results.get('coverage_pct', 0.0):.1f}%[/green]"
+                )
+                console.print(
+                    "\n[bold green]✨ Engine Self-Test & Verification Passed Successfully![/bold green]"
+                )
             else:
-                console.print(f"  [bold red]❌ Test suite encountered errors or failures: {coverage_results.get('error_output', '')}[/bold red]")
+                console.print(
+                    f"  [bold red]❌ Test suite encountered errors or failures: {coverage_results.get('error_output', '')}[/bold red]"
+                )
                 sys.exit(1)
         else:
-            console.print("  [yellow]⚠️ VerificationHook could not be imported. Skipping coverage suite.[/yellow]")
+            console.print(
+                "  [yellow]⚠️ VerificationHook could not be imported. Skipping coverage suite.[/yellow]"
+            )
         return
 
     # 5. Composer Mode (Multi-Step Recipe Execution)
     if args.recipe_goal:
-        target_files = args.targets or ([args.target_file] if args.target_file else [])
+        target_files = args.targets or (
+            [args.target_file] if args.target_file else []
+        )
         coordinator = ArchitectCoordinator(
             executor=executor,
             patcher=patcher,
@@ -285,28 +336,91 @@ def main():
             enable_searxng=not args.no_searxng,
             enable_upstream=not args.no_upstream,
         )
-        console.print("[bold magenta]=^-.-^= Composer Coordinator Active[/bold magenta]")
+
+        console.print(
+            "[bold magenta]=^-.-^= Composer Coordinator Active[/bold magenta]"
+        )
         console.print(f"[cyan]Goal:[/cyan] {args.recipe_goal}")
-        recipe = coordinator.create_recipe(goal=args.recipe_goal, target_files=target_files)
+
+        recipe = coordinator.create_recipe(
+            goal=args.recipe_goal, target_files=target_files
+        )
         if not recipe:
-            console.print("[bold red]❌ Error: No valid target files could be identified or inferred for recipe.[/bold red]")
+            console.print(
+                "[bold red]❌ Error: No valid target files could be identified or inferred for recipe.[/bold red]"
+            )
             sys.exit(1)
 
-        console.print(f"[cyan]Resolved Targets:[/cyan] {', '.join([s.target_file for s in recipe])}\n")
+        console.print(
+            f"[cyan]Resolved Targets:[/cyan] {', '.join([s.target_file for s in recipe])}\n"
+        )
 
         overall_success = True
         for step in recipe:
-            success = coordinator.execute_step(step)
-            if not success:
-                console.print(f"[bold red]❌ Recipe halted at Step {step.step_id}: {step.target_file}[/bold red]")
+            success, frame = coordinator.execute_step(step)
+            if success:
+                console.print(
+                    f"[bold green]✓ Applied changes and synchronized 3-tier memory for {step.target_file}[/bold green]"
+                )
+                if frame:
+                    render_thought_frame(frame, console_out=console)
+            else:
+                console.print(
+                    f"[bold red]❌ Recipe halted at Step {step.step_id}: {step.target_file}[/bold red]"
+                )
                 overall_success = False
                 break
 
         if overall_success:
-            console.print("\n[bold green]✨ Composer Recipe Executed Successfully![/bold green]")
+            console.print(
+                "\n[bold green]✨ Composer Recipe Executed Successfully![/bold green]"
+            )
         else:
             sys.exit(1)
         return
+
+    # Ends input after second =^-.-^= consider Keeping Standard Terminal EOF Signal instead
+    # 5.5 Script Intake Mode (-s / --script)
+    if args.script:
+        console.print(
+            "[bold magenta]=^-.-^= Intake Mode Active (Reading stdin)...[/bold magenta]"
+        )
+        lines = []
+        delimiter_count = 0
+
+        for line in sys.stdin:
+            lines.append(line)
+            # Only count lines that match the delimiter tag itself
+            if SCRIPT_DELIMITER in line:
+                delimiter_count += 1
+                # Exit early when closing delimiter tag is reached
+                if delimiter_count >= 2:
+                    break
+
+        raw_input = "".join(lines)
+        if not raw_input.strip():
+            console.print(
+                "[bold red]❌ Error: Empty intake stream on stdin.[/bold red]"
+            )
+            sys.exit(1)
+
+        handler = ScriptStreamHandler(executor=executor)
+        result = handler.process_stream(raw_input)
+        if result.success:
+            console.print(
+                "[bold green]✨ Script intake processed and executed successfully![/bold green]"
+            )
+            if result.stdout:
+                console.print(f"[dim white]{result.stdout}[/dim white]")
+        else:
+            console.print(
+                f"[bold red]❌ Script intake execution failed (Exit Code {result.returncode}):[/bold red]"
+            )
+            if result.stderr:
+                console.print(f"[red]{result.stderr}[/red]")
+            sys.exit(result.returncode)
+        return
+
 
     # 6. Standard Single-File Synthesis Mode (-i / --input)
     if args.prompt:
@@ -316,14 +430,19 @@ def main():
                 "via positional argument or -t/--targets.[/red]"
             )
             sys.exit(1)
-
         if not llm_client:
-            console.print("[red]Error: LLM client could not be initialized in environment.[/red]")
+            console.print(
+                "[red]Error: LLM client could not be initialized in environment.[/red]"
+            )
             sys.exit(1)
 
-        console.print(f"[bold green]=^-.-^= Synthesizing edits for {target_file}...[/bold green]")
+        console.print(
+            f"[bold green]=^-.-^= Synthesizing edits for {target_file}...[/bold green]"
+        )
         file_path = Path(target_file)
-        original_content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
+        original_content = (
+            file_path.read_text(encoding="utf-8") if file_path.exists() else ""
+        )
 
         system_prompt = (
             "CRITICAL: Output ONLY valid SEARCH and REPLACE blocks or code blocks. "
@@ -337,8 +456,9 @@ def main():
             else llm_client.generate_stream(system_prompt, user_prompt)
         )
 
-        workspace_ctx = [str(p) for p in Path(".").rglob("*.py") if not p.name.startswith(".")]
-
+        workspace_ctx = [
+            str(p) for p in Path(".").rglob("*.py") if not p.name.startswith(".")
+        ]
         frame = memory_pipeline.process_synthesis(
             instruction=args.prompt,
             raw_llm_response=raw_response,
@@ -351,8 +471,13 @@ def main():
         applied_any = False
         for block in blocks:
             target = block.filepath or target_file
-            r_block = block.replace_block if block.replace_block.strip() else block.search_anchor
-            success = executor.apply_anchor_edit(
+            r_block = (
+                block.replace_block
+                if block.replace_block.strip()
+                else block.search_anchor
+            )
+            # Replaced apply_anchor_edit with apply_resilient_edit
+            success = executor.apply_resilient_edit(
                 filepath=target,
                 search_anchor=block.search_anchor,
                 replace_block=r_block,
@@ -361,11 +486,15 @@ def main():
                 applied_any = True
 
         if applied_any:
-            console.print(f"[bold green]✓ Applied changes and synchronized 3-tier memory for {target_file}[/bold green]")
+            console.print(
+                f"[bold green]✓ Applied changes and synchronized 3-tier memory for {target_file}[/bold green]"
+            )
             if frame:
                 render_thought_frame(frame, console_out=console)
         else:
-            console.print(f"[bold red]❌ Synthesis or patching failed for {target_file}[/bold red]")
+            console.print(
+                f"[bold red]❌ Synthesis or patching failed for {target_file}[/bold red]"
+            )
             sys.exit(1)
         return
 

@@ -49,6 +49,7 @@ in
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
 	ns = "nh search";
 	yuko = "synth";
+	cat-intake="echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
       };
 
       initContent = ''

@@ -7,6 +7,7 @@ from .anchor_patch import AnchorPatcher, PatchBlock
 from .context import FileContext, RepoContext
 from .executor import Executor
 from .llm import LocalInferenceEngine
+from .intake import ScriptIntakeResult, ScriptStreamHandler
 
 __all__ = [
     "AnchorPatcher",
@@ -17,4 +18,6 @@ __all__ = [
     "LocalInferenceEngine",
     "PatchBlock",
     "RepoContext",
+    "ScriptIntakeResult",
+    "ScriptStreamHandler",
 ]

@@ -1,14 +1,16 @@
 # src/memory/working_memory.py
+
 import json
 import logging
-import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+import uuid
 
 from coordinator.pachinko import DispatchDecision, OperationalIntent, PachinkoRouter
+from engine.analyzer import CodeAnalyzer
 from engine.anchor_patch import AnchorPatcher
-from .thoughtframe_collection import ThoughtFrameFactory
 from .schemas import ThoughtFrame
+from .thoughtframe_collection import ThoughtFrameFactory
 
 if TYPE_CHECKING:
     from reasoning.pipeline import ReasoningOrchestrator
@@ -34,6 +36,7 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
         self,
         router: Optional[PachinkoRouter] = None,
         patcher: Optional[AnchorPatcher] = None,
+        analyzer: Optional[CodeAnalyzer] = None,
         store: Any = None,
         redis_store: Any = None,
         orchestrator: Optional["ReasoningOrchestrator"] = None,
@@ -41,6 +44,7 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
     ):
         self.router = router or PachinkoRouter()
         self.patcher = patcher or AnchorPatcher()
+        self.analyzer = analyzer or CodeAnalyzer()
         self.store = redis_store or store
         self.llm_client = llm_client
 
@@ -82,6 +86,7 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
             llm_client=llm_client or self.llm_client,
         )
         frame.session_id = sid
+
         # process_synthesis already invokes _persist_frame; re-persist if sid was updated
         self._persist_frame(frame)
         return frame
@@ -103,9 +108,11 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
         )
         resolved_path = str(decision.target_path)
 
-        # 2. Sanitize output and extract AST details
+        # 2. Sanitize output and extract AST details via CodeAnalyzer
         code_content = self._sanitize_code_content(raw_llm_response)
-        ast_facts = self.patcher.extract_ast_facts(resolved_path, code_content)
+        ast_facts = self.analyzer.extract_facts(
+            code_content, filepath=resolved_path
+        )
 
         # 3. Factory dispatch based on Pachinko OperationalIntent
         if decision.intent in (
@@ -192,7 +199,6 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
             + ast_facts.get("symbols", [])
             + ast_facts.get("symbols_modified", [])
         )
-
         fallback_tags = list(set([lang, "synthesis"] + symbols[:3]))
         fallback_title = (
             classes[0].lower()
@@ -222,9 +228,7 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
                 cleaned = cleaned.rsplit("```", 1)[0].strip()
             res = json.loads(cleaned)
             return {
-                "predicted_title": res.get(
-                    "predicted_title", fallback_title
-                ),
+                "predicted_title": res.get("predicted_title", fallback_title),
                 "semantic_summary": res.get(
                     "semantic_summary", fallback["semantic_summary"]
                 ),
@@ -236,9 +240,7 @@ Return ONLY a valid, raw JSON object with NO markdown code fences:
 
     def _persist_frame(self, frame: ThoughtFrame) -> None:
         """Pushes ThoughtFrame through 3-tier orchestrator (Redis, Vector, Neo4j) and fallback stores."""
-        if self.orchestrator and hasattr(
-            self.orchestrator, "process_and_store"
-        ):
+        if self.orchestrator and hasattr(self.orchestrator, "process_and_store"):
             try:
                 self.orchestrator.process_and_store(frame)
                 return

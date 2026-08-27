@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 # modules/synths/src/engine/anchor_patch.py
+
 import ast
 import difflib
 import json
+import logging
 import re
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 # -------------------------------------------------------------------
 # Hermetic Tree-Sitter Setup (Compatible with tree-sitter >= 0.22)
@@ -47,11 +52,10 @@ class PatchBlock(BaseModel):
 
 
 class AnchorPatcher:
-    """
-    Hermetic neuro-symbolic gatekeeper and parser.
-    Translates unconstrained LLM outputs into structured PatchBlocks,
-    validates syntax via Tree-Sitter/AST/heuristics, and extracts
-    structural topology facts for the knowledge graph.
+    """Hermetic neuro-symbolic gatekeeper and parser.
+
+    Translates unconstrained LLM outputs into structured PatchBlocks and
+    validates candidate syntax via Tree-Sitter/AST heuristics.
     """
 
     EXT_LANG_MAP = {
@@ -82,7 +86,10 @@ class AnchorPatcher:
     def parse_blocks(
         self, raw_output: str, fallback_filepath: str = ""
     ) -> List[PatchBlock]:
-        """Parses raw model output into structured PatchBlocks supporting JSON, SEARCH/REPLACE, and file sections."""
+        """Parses raw model output into structured PatchBlocks supporting JSON,
+
+        SEARCH/REPLACE, and file sections.
+        """
         blocks: List[PatchBlock] = []
         if not raw_output or not raw_output.strip():
             return blocks
@@ -136,7 +143,7 @@ class AnchorPatcher:
                 lines = lines[:-1]
             cleaned = "\n".join(lines).strip()
 
-            # 2. SEARCH/REPLACE Block Parsing Strategy
+            # 2. SEARCH/REPLACE Block Parsing Strategy (Unified Diff & Modular Fences)
             pattern = re.compile(
                 r"(?:FILE:\s*(?P<filepath>[^\n`#]+)\n)?"
                 r"(?:[#\s]*SEARCH:?\s*\n)?"
@@ -222,14 +229,19 @@ class AnchorPatcher:
 
     def locate_fuzzy_anchor(
         self, content: str, search_anchor: str, threshold: float = 0.75
-    ) -> Optional[tuple[int, int, float]]:
-        """Locates search anchor positions using exact match followed by indentation-insensitive SequenceMatcher scoring."""
+    ) -> Optional[Tuple[int, int, float]]:
+        """Locates search anchor positions using exact match followed by
+
+        indentation-insensitive SequenceMatcher scoring.
+        """
         norm_search = search_anchor.strip()
         if not norm_search:
             return None
+
         content_lines = content.splitlines()
         anchor_lines = [l for l in search_anchor.splitlines() if l.strip()]
         window_size = len(anchor_lines)
+
         if not anchor_lines or window_size > len(content_lines):
             return None
 
@@ -241,7 +253,7 @@ class AnchorPatcher:
                 ):
                     return (i, i + window_size, 100.0)
 
-        best_match: Optional[tuple[int, int, float]] = None
+        best_match: Optional[Tuple[int, int, float]] = None
         best_score = 0.0
         target_str = "\n".join(anchor_lines)
 
@@ -254,21 +266,6 @@ class AnchorPatcher:
                 best_match = (i, i + window_size, ratio * 100.0)
 
         return best_match
-
-    def wrap_symbolic_syntax(self, code: str, ast_facts: Dict[str, Any]) -> str:
-        """Compresses vector relations and injects symbolic annotations ('@') for custom reasoning DSL parsing."""
-        funcs = ast_facts.get("functions", [])
-        wrapped_lines = []
-        for line in code.splitlines():
-            trimmed = line.strip()
-            if any(
-                trimmed.startswith(f"def {fn}")
-                or trimmed.startswith(f"function {fn}")
-                for fn in funcs
-            ):
-                wrapped_lines.append("@symbolic_node(scope='function')")
-            wrapped_lines.append(line)
-        return "\n".join(wrapped_lines)
 
     def _extract_code_fault_tolerant(self, filepath: str, text: str) -> str:
         ext = Path(filepath).suffix.lower() if filepath else ""
@@ -289,13 +286,17 @@ class AnchorPatcher:
         cleaned = text.strip()
         cleaned = re.sub(r"^```[a-zA-Z0-9_-]*\n?", "", cleaned)
         cleaned = re.sub(r"\n?```$", "", cleaned).strip()
+
         if self._validate_syntax(ext, cleaned):
             return cleaned + "\n"
 
         return ""
 
     def _validate_syntax(self, ext: str, code: str) -> bool:
-        """Validates code blocks and filters out conversational prose using heuristic rules and parsers."""
+        """Validates code blocks and filters out conversational prose using
+
+        heuristic rules and parsers.
+        """
         if not code.strip():
             return False
 
@@ -365,96 +366,3 @@ class AnchorPatcher:
             return True
 
         return True
-
-    def extract_ast_facts(self, filepath: str, code: str) -> Dict[str, Any]:
-        """Extracts top-level functions, classes, imports, and complexity metrics using Python AST and Tree-Sitter."""
-        ext = Path(filepath).suffix.lower() if filepath else ""
-        facts: Dict[str, Any] = {
-            "functions": [],
-            "classes": [],
-            "imports": [],
-            "symbols": [],
-            "complexity_metrics": {
-                "line_count": len(code.splitlines()),
-                "character_count": len(code),
-            },
-        }
-        if not code.strip():
-            return facts
-
-        if ext == ".py":
-            try:
-                parsed = ast.parse(code)
-                for node in ast.walk(parsed):
-                    if isinstance(node, ast.ClassDef):
-                        if node.name not in facts["classes"]:
-                            facts["classes"].append(node.name)
-                            facts["symbols"].append(f"class:{node.name}")
-                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if node.name not in facts["functions"]:
-                            facts["functions"].append(node.name)
-                            facts["symbols"].append(f"fn:{node.name}")
-                    elif isinstance(node, ast.Import):
-                        for alias in node.names:
-                            if alias.name not in facts["imports"]:
-                                facts["imports"].append(alias.name)
-                    elif isinstance(node, ast.ImportFrom):
-                        if node.module and node.module not in facts["imports"]:
-                            facts["imports"].append(node.module)
-
-                facts["symbols_modified"] = facts["symbols"]
-                return facts
-            except Exception:
-                pass
-
-        if HAS_TREE_SITTER and ext in LANGUAGES and Parser is not None:
-            try:
-                parser = Parser(LANGUAGES[ext])
-                tree = parser.parse(bytes(code, "utf-8"))
-                func_types = {
-                    "function_definition",
-                    "async_function_definition",
-                    "function_item",
-                }
-                class_types = {
-                    "class_definition",
-                    "struct_specifier",
-                    "class_specifier",
-                }
-                import_types = {
-                    "import_statement",
-                    "import_from_statement",
-                    "preproc_include",
-                }
-
-                def traverse(node):
-                    if node.type in func_types:
-                        name_node = node.child_by_field_name("name")
-                        if name_node and name_node.text:
-                            fn_name = name_node.text.decode("utf-8")
-                            if fn_name not in facts["functions"]:
-                                facts["functions"].append(fn_name)
-                                facts["symbols"].append(f"fn:{fn_name}")
-                    elif node.type in class_types:
-                        name_node = node.child_by_field_name("name") or node.child_by_field_name("type")
-                        if name_node and name_node.text:
-                            cls_name = name_node.text.decode("utf-8")
-                            if cls_name not in facts["classes"]:
-                                facts["classes"].append(cls_name)
-                                facts["symbols"].append(f"class:{cls_name}")
-                    elif node.type in import_types:
-                        imp_text = node.text.decode("utf-8").strip()
-                        if imp_text not in facts["imports"]:
-                            facts["imports"].append(imp_text)
-
-                    for child in node.children:
-                        traverse(child)
-
-                traverse(tree.root_node)
-                facts["symbols_modified"] = facts["symbols"]
-            except Exception:
-                pass
-
-        return facts
-
-

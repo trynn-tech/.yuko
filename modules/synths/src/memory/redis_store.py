@@ -245,7 +245,7 @@ def watch_thought_stream(redis_store: RedisMemoryStore, poll_interval: float = 1
 
                 frame = redis_store.retrieve_thought_frame(session_id)
                 if frame:
-                    console.print(f"\n[bold magenta]⚡ [EVENT] New Frame ({ts}):[/bold magenta]")
+                    console.print(f"\n[bold magenta]=^-.-^= [EVENT] New Frame ({ts}):[/bold magenta]")
                     render_thought_frame(frame, console_out=console)
                 else:
                     console.print(

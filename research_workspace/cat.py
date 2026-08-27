@@ -1,24 +1,24 @@
-import time
-import os
+import random
 
-# ASCII art of a cat
-cat_art = """
- /\_/\  
-( o.o ) 
- > ^ <
-"""
+def generate_cat():
+    cats = [
+        " /\_/\  ",
+        "( o.o ) ",
+        " > ^ <
+    ]
+    return random.choice(cats)
 
-print(cat_art)
+def create_unimatrix(num_cats):
+    unimatrix = []
+    for _ in range(num_cats):
+        unimatrix.append(generate_cat())
+    return unimatrix
 
-class Cat:
-    def meow(self):
-        os.system("echo 'Meow~' | lolcat")
-
-    def dancing_meows(self):
-        for _ in range(5):
-            self.meow()
-            time.sleep(0.5)
+def main():
+    num_cats = 10  # You can change this number to generate more or fewer cats
+    unimatrix = create_unimatrix(num_cats)
+    for cat in unimatrix:
+        print(cat)
 
 if __name__ == "__main__":
-    cat = Cat()
-    cat.dancing_meows()
+    main()

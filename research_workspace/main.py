@@ -1,21 +1,20 @@
-class TerminalEmulator:
-    def __init__(self):
-        self.screen = [[' ' for _ in range(80)] for _ in range(24)]
+import time
+import os
 
-    def display(self):
-        for row in self.screen:
-            print(''.join(row))
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-    def write(self, text, x, y):
-        for i, char in enumerate(text):
-            self.screen[y][x + i] = char
+def print_unimatrix():
+    cat_art = [
+        " /\_/\  ",
+        "( o.o ) ",
+        " > ^ <
+    ]
+    for _ in range(10):
+        clear_screen()
+        for line in cat_art:
+            print(line.center(20))
+        time.sleep(0.5)
 
-    def emulate_unimatrix(self):
-        for y in range(24):
-            for x in range(80):
-                self.screen[y][x] = 'm' if (x + y) % 2 == 0 else 'o'
-
-# Create a terminal emulator and display it
-my_terminal = TerminalEmulator()
-my_terminal.emulate_unimatrix()
-my_terminal.display()
+if __name__ == "__main__":
+    print_unimatrix()

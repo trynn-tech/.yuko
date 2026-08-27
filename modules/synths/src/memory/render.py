@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # src/memory/render.py
-
 import json
 import shutil
-from typing import Any, Dict, Union, Optional
+from typing import Any, Dict, List, Optional, Union
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -11,7 +10,26 @@ from rich.table import Table
 
 console = Console()
 
-def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optional[Console] = None, header_title: Optional[str] = None) -> None:
+
+def _flatten_symbols(sym_list: Any) -> List[str]:
+    """Recursively flattens nested symbol lists/tuples into a flat list of strings."""
+    flat = []
+    if isinstance(sym_list, (list, tuple)):
+        for item in sym_list:
+            if isinstance(item, (list, tuple)):
+                flat.extend(_flatten_symbols(item))
+            elif item is not None:
+                flat.append(str(item))
+    elif sym_list is not None:
+        flat.append(str(sym_list))
+    return flat
+
+
+def render_thought_frame(
+    frame: Union[Dict[str, Any], Any],
+    console_out: Optional[Console] = None,
+    header_title: Optional[str] = None,
+) -> None:
     """Renders a ThoughtFrame to the console using Rich tables, panels, and syntax highlighting."""
     c = console_out or console
     if not frame:
@@ -40,7 +58,7 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
 
     session_id = data.get("session_id", getattr(frame, "session_id", "N/A"))
     payload_type = data.get("payload_type", getattr(frame, "payload_type", "UNKNOWN"))
-    
+
     target_file = (
         data.get("resolved_path")
         or data.get("target_file")
@@ -48,7 +66,7 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
         or getattr(frame, "resolved_path", None)
         or getattr(frame, "target_file", "N/A")
     )
-    
+
     lang = (
         data.get("language")
         or getattr(frame, "language", None)
@@ -57,7 +75,6 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
 
     verified = data.get("verification_passed", getattr(frame, "verification_passed", True))
     ver_status = "[bold green]PASS[/bold green]" if verified else "[bold red]FAIL[/bold red]"
-
     ast_facts = data.get("ast_facts", {})
     payload = data.get("payload", {})
 
@@ -78,7 +95,8 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
 
     tags = data.get("concept_tags") or getattr(frame, "concept_tags", [])
     if tags:
-        meta_table.add_row("Concept Tags:", f"[yellow]{', '.join(tags)}[/yellow]")
+        flat_tags = _flatten_symbols(tags)
+        meta_table.add_row("Concept Tags:", f"[yellow]{', '.join(flat_tags)}[/yellow]")
 
     c.print(meta_table)
 
@@ -101,17 +119,21 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
         lines_removed = payload.get("lines_removed", 0)
         orig_lines = payload.get("original_line_count", 0)
         upd_lines = payload.get("updated_line_count", 0)
-        
-        # Extract AST symbols
+
+        # Extract AST symbols safely
         functions = ast_facts.get("functions", [])
         classes = ast_facts.get("classes", [])
-        symbols = []
+        raw_symbols = []
+
         if classes:
-            symbols.extend([f"[cyan]class:{c}[/cyan]" for c in classes])
+            raw_symbols.extend([f"[cyan]class:{c}[/cyan]" for c in _flatten_symbols(classes)])
         if functions:
-            symbols.extend([f"[blue]fn:{f}[/blue]" for f in functions])
-        if not symbols:
-            symbols = [ast_facts.get("symbols_modified", "None")]
+            raw_symbols.extend([f"[blue]fn:{f}[/blue]" for f in _flatten_symbols(functions)])
+
+        if not raw_symbols:
+            raw_symbols = ast_facts.get("symbols_modified", ast_facts.get("symbols", []))
+
+        symbols = _flatten_symbols(raw_symbols)
 
         edit_table = Table(show_header=True, header_style="bold magenta", expand=True)
         edit_table.add_column("Metric", style="bold white", width=20)
@@ -127,24 +149,30 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
         )
         edit_table.add_row(
             "AST Symbols",
-            ", ".join(symbols) if isinstance(symbols, list) and symbols else "None",
+            ", ".join(symbols) if symbols else "None",
         )
 
         c.print(edit_table)
 
     elif payload_type == "CREATE" or "created_content" in payload:
         c.print("\n[bold green]✨ File Creation Details:[/bold green]")
-        
+
         lines = payload.get("total_lines_created", payload.get("line_count", 0))
         num_bytes = payload.get("file_bytes", payload.get("byte_size", 0))
-        
+
         functions = ast_facts.get("functions", [])
         classes = ast_facts.get("classes", [])
-        symbols = []
+        raw_symbols = []
+
         if classes:
-            symbols.extend([f"[cyan]class:{cls_item}[/cyan]" for cls_item in classes])
+            raw_symbols.extend([f"[cyan]class:{cls_item}[/cyan]" for cls_item in _flatten_symbols(classes)])
         if functions:
-            symbols.extend([f"[blue]fn:{fn_item}[/blue]" for fn_item in functions])
+            raw_symbols.extend([f"[blue]fn:{fn_item}[/blue]" for fn_item in _flatten_symbols(functions)])
+
+        if not raw_symbols:
+            raw_symbols = ast_facts.get("symbols_modified", ast_facts.get("symbols", []))
+
+        symbols = _flatten_symbols(raw_symbols)
 
         create_table = Table(show_header=True, header_style="bold green", expand=True)
         create_table.add_column("Property", style="bold white", width=20)
@@ -169,6 +197,7 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
         or data.get("raw_response")
         or data.get("code")
     )
+
     if code_payload:
         clean_code = str(code_payload).strip()
         if clean_code.startswith("```"):
@@ -178,6 +207,7 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
             if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
             clean_code = "\n".join(lines).strip()
+
         syntax_lang = "python" if lang in ("text", "", None) else lang
         syntax = Syntax(
             clean_code[:2000],
@@ -194,4 +224,5 @@ def render_thought_frame(frame: Union[Dict[str, Any], Any], console_out: Optiona
                 expand=True,
             )
         )
+
     c.print("-" * columns)
