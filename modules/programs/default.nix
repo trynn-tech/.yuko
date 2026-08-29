@@ -22,6 +22,10 @@
     playerctl # media controls
     handy # yuko stt
     scope-tui # audio visualizer
+    qpwgraph # visualize audio/video streams 
+    helvum # A GTK-based visual patchbay for PipeWire
+    coppwr # A low-level PipeWire object and parameter explorer
+    gnuplot 
   ];
 
 }

@@ -1,25 +1,3 @@
-// Navigation & Key Mappings
-api.unmap('t');
-api.map('t', 'T');
-api.map('T', 'on');
-api.map('M', 'om');
-
-// Ergonomic Key Overrides
-api.unmap('u');
-api.map('u', 'f');
-api.map('U', 'af');
-api.unmap('f');
-api.map('a', 'gf');
-
-// Tridactyl-inspired bindings
-api.map('H', 'S');
-api.map('L', 'D');
-
-// Hint Mode Shortcuts
-api.map('cd', ';fs');
-
-// Open Youtube Videos in Private mode
-api.mapkey('Y', 'Open current YouTube page in FreeTube', () => {
   const url = window.location.href;
 
   if (!/(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url)) {
@@ -43,6 +21,25 @@ api.mapkey('F', 'Open a hinted YouTube link in FreeTube', () => {
   });
 });
 
+// Navigation & Key Mappings
+ api.map('on', 't');
+ api.map('T', 't');
+ api.map('t', 'on');
+api.map('M', 'om');
+
+// Ergonomic Key Overrides
+api.unmap('u');
+api.map('u', 'f');
+api.map('U', 'af');
+api.unmap('f');
+api.map('a', 'gf');
+
+// Tridactyl-inspired bindings
+api.map('H', 'S');
+api.map('L', 'D');
+
+// Hint Mode Shortcuts
+api.map('cd', ';fs');
 
 // --- Visual Theme: Cyber Rosé Pine with Neon Violet Tags ---
 
