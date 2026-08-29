@@ -98,6 +98,24 @@ def test_executor_fuzzy_splice_fallback(temp_repo):
     assert "setup" in new_content
 
 
+def test_executor_refuses_structural_append_on_failed_anchor(temp_repo):
+    """Verifies that Executor fails cleanly and rolls back when search anchors do not match."""
+    target = temp_repo / "unmatched.py"
+    initial_content = "def existing_function():\n    return True\n"
+    target.write_text(initial_content)
+
+    executor = Executor(repo_path=temp_repo)
+    executor.has_sd = False
+
+    invalid_search = "def missing_function():\n    pass"
+    replacement = "def new_function():\n    return False"
+
+    success = executor.run_edit_pass(str(target), invalid_search, replacement)
+
+    # Must fail and preserve exact file content without appending
+    assert success is False
+    assert target.read_text() == initial_content
+
 # ==========================================
 # KNOWLEDGE GRAPH LINKER TEST SUITE
 # ==========================================

@@ -5,14 +5,15 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 def print_unimatrix():
-    cat_art = [
-        " /\_/\  ",
-        "( o.o ) ",
-        " > ^ <
+    cats = [
+        r" /\_/\  ",
+        r"( o.o ) ",
+        r" > ^ <  ",
+        r" [tmux] "
     ]
     for _ in range(10):
         clear_screen()
-        for line in cat_art:
+        for line in cats:
             print(line.center(20))
         time.sleep(0.5)
 

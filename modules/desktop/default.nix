@@ -18,6 +18,5 @@
     arandr         
     adwaita-icon-theme 
     brightnessctl   
-    pavucontrol     
   ];
 }

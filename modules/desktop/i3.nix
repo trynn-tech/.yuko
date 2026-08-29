@@ -158,7 +158,7 @@ in {
 	  # Text Expanding Shortcuts via Clipboard Buffer
 	   "Mod4+b" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`\"'";
 
-	  "Mod4+Shift+v" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`bash\"'";
+	  "Mod4+Shift+b" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`bash\"'";
 	  "Mod4+Shift+n" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`nix\"'";
 	  "Mod4+Shift+m" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`python\"'";
           

@@ -28,8 +28,10 @@ logs/
 .tags/*
 tags
 .ctags
-
 .ctags/
+
+.yuko/modules/synths/.coverage
+.yuko/modules/synths/converage.json
 
 # -------------------------
 # Editor / tooling cruft

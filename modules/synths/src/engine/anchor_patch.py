@@ -83,21 +83,23 @@ class AnchorPatcher:
         ext = Path(filepath).suffix.lower()
         return self.EXT_LANG_MAP.get(ext, "text")
 
+
     def parse_blocks(
         self, raw_output: str, fallback_filepath: str = ""
     ) -> List[PatchBlock]:
         """Parses raw model output into structured PatchBlocks supporting JSON,
-
-        SEARCH/REPLACE, and file sections.
+        SEARCH/REPLACE, and file sections without mangling whitespace or backslashes.
         """
         blocks: List[PatchBlock] = []
         if not raw_output or not raw_output.strip():
             return blocks
 
-        cleaned = raw_output.strip()
+        # Normalize default fallback path
+        default_filepath = fallback_filepath.strip() if fallback_filepath else "_stream_payload.tmp"
+        cleaned = raw_output
 
         # 1. JSON Payload Parsing Strategy
-        json_candidate = cleaned
+        json_candidate = cleaned.strip()
         if json_candidate.startswith("```json"):
             json_candidate = json_candidate[7:]
         elif json_candidate.startswith("```"):
@@ -110,7 +112,7 @@ class AnchorPatcher:
             data = json.loads(json_candidate)
             if isinstance(data, dict):
                 if "search" in data and "replace" in data:
-                    fpath = data.get("filepath", fallback_filepath)
+                    fpath = data.get("filepath") or default_filepath
                     blocks.append(
                         PatchBlock(
                             filepath=fpath,
@@ -122,7 +124,7 @@ class AnchorPatcher:
                 elif "blocks" in data and isinstance(data["blocks"], list):
                     for b in data["blocks"]:
                         if "search" in b and "replace" in b:
-                            fpath = b.get("filepath", fallback_filepath)
+                            fpath = b.get("filepath") or default_filepath
                             blocks.append(
                                 PatchBlock(
                                     filepath=fpath,
@@ -135,15 +137,7 @@ class AnchorPatcher:
             pass
 
         if not blocks:
-            # Strip standard markdown fences for text-based parsing
-            lines = cleaned.splitlines()
-            if lines and lines[0].strip().startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            cleaned = "\n".join(lines).strip()
-
-            # 2. SEARCH/REPLACE Block Parsing Strategy (Unified Diff & Modular Fences)
+            # 2. SEARCH/REPLACE Block Parsing Strategy
             pattern = re.compile(
                 r"(?:FILE:\s*(?P<filepath>[^\n`#]+)\n)?"
                 r"(?:[#\s]*SEARCH:?\s*\n)?"
@@ -159,9 +153,9 @@ class AnchorPatcher:
                 for match in matches:
                     raw_path = match.group("filepath")
                     filepath = (
-                        raw_path.strip() if raw_path else fallback_filepath
+                        raw_path.strip() if raw_path else default_filepath
                     )
-                    filepath = re.sub(r"^[`'\s]+|[`'\s]+$", "", filepath)
+                    filepath = re.sub(r"^[`'\s]+|[`'\s]+$", "", filepath) or default_filepath
                     search = match.group("search")
                     replace = match.group("replace")
                     lang = self._detect_language(filepath)
@@ -204,15 +198,15 @@ class AnchorPatcher:
         if not blocks:
             # 4. Fallback Single-Pass Extraction
             extracted = self._extract_code_fault_tolerant(
-                fallback_filepath, cleaned
+                default_filepath, cleaned
             )
             if extracted.strip():
                 blocks.append(
                     PatchBlock(
-                        filepath=fallback_filepath,
+                        filepath=default_filepath,
                         search_anchor="",
                         replace_block=extracted,
-                        language=self._detect_language(fallback_filepath),
+                        language=self._detect_language(default_filepath),
                     )
                 )
 
@@ -226,6 +220,7 @@ class AnchorPatcher:
                 unique_blocks.append(block)
 
         return unique_blocks
+
 
     def locate_fuzzy_anchor(
         self, content: str, search_anchor: str, threshold: float = 0.75

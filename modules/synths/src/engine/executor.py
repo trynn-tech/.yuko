@@ -119,12 +119,14 @@ class Executor:
             )
         return str(fpath), str(search), str(replace)
 
+
     def apply_resilient_edit(
         self, filepath: str, search_anchor: str, replace_block: str
     ) -> bool:
-        """Multi-stage edit pipeline: AST Match -> Exact Search -> Fuzzy Match -> Contextual Fallback."""
+        """Multi-stage edit pipeline: AST Match -> Exact Search -> Fuzzy Match."""
         context_finder = RepoContext(root_path=self.repo_path)
         target_file = Path(filepath)
+
         if not target_file.is_absolute():
             target_file = (self.repo_path / target_file).resolve()
         if target_file.is_dir():
@@ -142,6 +144,8 @@ class Executor:
 
         replace_block = self._clean_content_payload(replace_block)
         was_created = not target_file.exists()
+
+        # Handle whole-file writes and creation early
         if was_created or not search_anchor.strip():
             return self.write_file(str(target_file), replace_block)
 
@@ -153,7 +157,7 @@ class Executor:
             )
             return False
 
-        # Attempt Stage 1: Explicit or Inferred AST Symbol Target
+        # Stage 1: Explicit or Inferred AST Symbol Target
         symbol_target = self._infer_ast_symbol(
             target_file, original_content, search_anchor, replace_block
         )
@@ -163,7 +167,7 @@ class Executor:
             ):
                 return True
 
-        # Attempt Stage 2: Exact Text Match (sd / python string replace)
+        # Stage 2: Exact Text Match (sd / python string replace)
         norm_search = search_anchor.replace("\r\n", "\n").strip()
         norm_replace = replace_block.replace("\r\n", "\n")
         norm_content = original_content.replace("\r\n", "\n")
@@ -182,7 +186,7 @@ class Executor:
                 )
                 return True
 
-        # Attempt Stage 3: Fuzzy Ratio Splicing
+        # Stage 3: Fuzzy Ratio Splicing
         success, line_bounds = self._apply_fuzzy_splice(
             target_file, norm_content, norm_search, norm_replace
         )
@@ -192,20 +196,13 @@ class Executor:
             )
             return True
 
-        # Attempt Stage 4: Append / Structural Recovery Fallback
-        if self._apply_structural_fallback(
-            target_file, norm_content, replace_block
-        ):
-            console.print(
-                f"[yellow]Applied structural recovery edit to {target_file.name}[/yellow]"
-            )
-            return True
-
+        # All targeted search attempts failed: Halt and trigger git rollback
         console.print(
             f"[red]All edit stages failed for {target_file.name}. Rolling back...[/red]"
         )
         self._rollback(target_file, original_content, was_created)
         return False
+
 
     def _infer_ast_symbol(
         self,
@@ -356,12 +353,21 @@ class Executor:
             indent_prefix = first_line[
                 : len(first_line) - len(first_line.lstrip())
             ]
-
+            
             replace_lines = replace.splitlines()
-            formatted_replacement = [
-                f"{indent_prefix}{l.strip()}\n" if l.strip() else "\n"
-                for l in replace_lines
+            # Calculate common baseline indentation of replace block
+            non_empty_indents = [
+                len(l) - len(l.lstrip()) for l in replace_lines if l.strip()
             ]
+            base_indent = min(non_empty_indents) if non_empty_indents else 0
+
+            formatted_replacement = []
+            for l in replace_lines:
+                if not l.strip():
+                    formatted_replacement.append("\n")
+                else:
+                    rel_line = l[base_indent:]
+                    formatted_replacement.append(f"{indent_prefix}{rel_line}\n")
 
             new_lines = (
                 file_lines[:start_line]
@@ -371,20 +377,6 @@ class Executor:
             write_ok = self._write_file_safe(target_file, "".join(new_lines))
             return write_ok, (start_line + 1, end_line)
         return False, None
-
-    def _apply_structural_fallback(
-        self, target_file: Path, content: str, replace_block: str
-    ) -> bool:
-        """Safely appends complete blocks when search anchors fail entirely."""
-        if not replace_block.strip():
-            return False
-        # Avoid appending duplicate blocks
-        if replace_block.strip() in content:
-            return True
-
-        separator = "\n\n" if not content.endswith("\n\n") else ""
-        new_content = content + separator + replace_block.strip() + "\n"
-        return self._write_file_safe(target_file, new_content)
 
     def _write_file_safe(self, target_file: Path, content: str) -> bool:
         try:
