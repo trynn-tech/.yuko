@@ -47,31 +47,29 @@ in
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
-	ns = "nh search";
-	yuko = "synth";
-	cat-intake="echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
+        ns = "nh search";
+        cat-intake = "echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
       };
 
       initContent = ''
-	# --- AUTOSTART TMUX (Independent Numbered Sessions) ---
-	if [[ -z "$TMUX" ]] && [[ -n "$PS1" ]] && [[ $- == *i* ]]; then
-	  local active_sessions
-	  active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
-	
-	  local max_num=-1
-	  local name num
-	
-	  while IFS= read -r name; do
-	    # Strip all non-digit characters to get just the integer
-	    num="''${name//[^0-9]/}"
-	    if [[ -n "$num" ]]; then
-	      (( num > max_num )) && max_num=$num
-	    fi
-	  done <<< "$active_sessions"
-	
-	  local session_num=$(( max_num + 1 ))
-	  tmux new-session -s "$session_num"
-	fi
+        # --- AUTOSTART TMUX (Independent Numbered Sessions) ---
+        if [[ -z "$TMUX" ]] && [[ -n "$PS1" ]] && [[ $- == *i* ]]; then
+          local active_sessions
+          active_sessions=$(tmux list-sessions -F '#S' 2>/dev/null)
+
+          local max_num=-1
+          local name num
+
+          while IFS= read -r name; do
+            num="''${name//[^0-9]/}"
+            if [[ -n "$num" ]]; then
+              (( num > max_num )) && max_num=$num
+            fi
+          done <<< "$active_sessions"
+
+          local session_num=$(( max_num + 1 ))
+          tmux new-session -s "$session_num"
+        fi
 
         export FLAKE="${yukoFlake}"
 
@@ -79,8 +77,7 @@ in
           . "$HOME/.nix-profile/etc/profile.d/hm-session-vars.sh"
         fi
 
-	# --- VI MODE FIXES ---
-        # Ensure backspace works properly in insert mode
+        # --- VI MODE FIXES ---
         bindkey -v '^?' backward-delete-char
         bindkey -v '^H' backward-delete-char
 
@@ -94,65 +91,89 @@ in
           echo -e "\033[1;31m🧹 Clipboard securely wiped.\033[0m"
         }
 
-	yuko_snowball() {
+        yuko_snowball() {
           cd "${yukoFlake}" || return 1
-
-	  if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+          if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
             echo "[yuko] updating flake inputs..."
             nix flake update
           fi
-          
-          # Run offline check before formatting/activating if disconnected
+
           if command -v yuko-offline-check &>/dev/null; then
             yuko-offline-check
           fi
-
           echo "[yuko] formatting..."
           nix fmt . 2>/dev/null
           echo "[yuko] activating configuration..."
           home-manager switch -b backup --flake .#yuko-core
         }
 
-	lol(){
-	  yuko_snowball | lolcat
-	}
+        lol(){
+          yuko_snowball | lolcat
+        }
 
-	yuko_roam() {
+        yuko_roam() {
           cd "${yukoFlake}" || return 1
-
-	  if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+          if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
             echo "[yuko] updating flake inputs..."
             nix flake update
           fi
-          
-          # Run offline check before formatting/activating if disconnected
+
           if command -v yuko-offline-check &>/dev/null; then
             yuko-offline-check
           fi
-
           echo "[yuko] formatting..."
           nix fmt . 2>/dev/null
           echo "[yuko] activating configuration..."
           home-manager switch -b backup --flake .#yuko-fob
         }
 
-	alias -g mew="| lolcat"
+        alias -g mew="| lolcat"
+
+        # Router: Route interactive subcommands, fallback directly to synth CLI
+        yuko() {
+          if [ $# -eq 0 ]; then
+            command synth --help
+            return 0
+          fi
+
+          case "$1" in
+            overview)
+              shift
+              synth-overview "$@"
+              return $?
+              ;;
+            network)
+              shift
+              PATH="/run/wrappers/bin:$PATH" tshark -n -l -i any -f "not port 22" \
+                -T fields -e frame.time_relative -e ip.src -e ip.dst -e frame.protocols "$@"
+              return $?
+              ;;
+            *)
+              command synth "$@"
+              ;;
+          esac
+        }
 
         [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme
         source ${pkgs.zsh-autosuggestions}/share/zsh-autosuggestions/zsh-autosuggestions.zsh
         source ${pkgs.zsh-syntax-highlighting}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
         [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
-	cat ${yukoFlake}/modules/desktop/assets/ghost.txt
+        cat ${yukoFlake}/modules/desktop/assets/ghost.txt
+
         if command -v task &> /dev/null; then
-            # Extract exactly 1 pending task with the highest urgency
-            NEXT_TASK=$(task active limit:1 2>/dev/null | grep -E '^[ ]*[0-9]' | sed -E 's/^[ ]*[0-9]+[ ]+[0-9\.]+[ ]+//')
-            
-            # Print the task focus banner right above your prompt
+            # Reliably fetch highest-priority active task using JSON export + jq
+            NEXT_TASK=$(task +ACTIVE export 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[0].description // empty')
+
+            # Fall back to highest-urgency pending task if no active task exists
+            if [ -z "$NEXT_TASK" ]; then
+                NEXT_TASK=$(task status:pending export 2>/dev/null | ${pkgs.jq}/bin/jq -r 'sort_by(.urgency) | reverse | .[0].description // empty')
+            fi
+
             if [ -n "$NEXT_TASK" ]; then
-                echo " \e[1;33mFocus Task:\e[0m $NEXT_TASK\n" | lolcat
+                echo -e " \e[1;33mFocus Task:\e[0m $NEXT_TASK\n" | lolcat
             else
-                echo " \e[1;32mNo pending tasks! Your schedule is clear.\e[0m\n" lolcat
+                echo -e " \e[1;32mNo pending tasks! Your schedule is clear.\e[0m\n" | lolcat
             fi
         fi
       '';
@@ -160,7 +181,7 @@ in
 
     home.packages = with pkgs; [
       nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils
-      fortune lolcat aaa jp2a unimatrix sl 
+      fortune lolcat aaa jp2a unimatrix sl jq
     ];
   };
 }

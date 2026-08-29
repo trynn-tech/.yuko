@@ -12,9 +12,10 @@
   home.packages = with pkgs; [
     copyq          
     feh            
-    vlc
-    wireshark
     btop # process monitor
+    nvtopPackages.full # GPU monitor
+    wireshark # network monitor
+    termshark # network monitor tui
     ncdu # storage management
     caligula # Image flasher
     freetube 
@@ -23,9 +24,9 @@
     handy # yuko stt
     scope-tui # audio visualizer
     qpwgraph # visualize audio/video streams 
-    helvum # A GTK-based visual patchbay for PipeWire
     coppwr # A low-level PipeWire object and parameter explorer
-    gnuplot 
+    gnuplot # cli graphing utility
+    yt-dlp
   ];
 
 }

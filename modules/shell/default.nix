@@ -8,6 +8,7 @@ in
   imports = [
     ./zsh
     ./tmux
+    ./zellij
     ./ledger.nix
   ];
 

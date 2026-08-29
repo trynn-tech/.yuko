@@ -14,13 +14,13 @@
       input-ipc-server=''${XDG_RUNTIME_DIR}/mpv-socket-yuko
     '';
 
-    # Native mpv window keybindings integrated here to fix file generation conflicts
+    # Native mpv window keybindings integrated here
     bindings = {
       j = "playlist-prev";
       k = "playlist-next";
       n = "playlist-next";
       b = "playlist-prev";
-      i = "run \"\${config.home.homeDirectory}/.local/bin/mpv-fzf-menu\"";
+      i = "run \"${config.home.homeDirectory}/.local/bin/mpv-fzf-menu\"";
       "0" = "seek 0 absolute-percent";
       "1" = "seek 10 absolute-percent";
       "2" = "seek 20 absolute-percent";
@@ -31,6 +31,22 @@
       "7" = "seek 70 absolute-percent";
       "8" = "seek 80 absolute-percent";
       "9" = "seek 90 absolute-percent";
+
+      # --- Audio Filter Hotkeys ---
+      F1 = ''show-text "F2: loudnorm | F3: dynaudnorm | F4: low Bass | F5: low Treble" 2000 | F6-F12: unkown audio filters'';
+      F2 = "af toggle lavfi=[loudnorm=I=-16:TP=-3:LRA=4]";
+      F3 = "af toggle lavfi=[dynaudnorm=g=5:f=250:r=0.9:p=0.5]";
+      F4 = ''af toggle "superequalizer=6b=2:7b=2:8b=2:9b=2:10b=2:11b=2:12b=2:13b=2:14b=2:15b=2:16b=2:17b=2:18b=2"'';
+      F5 = ''af toggle "superequalizer=1b=2:2b=2:3b=2:4b=2:5b=2:6b=2:7b=2:8b=2:9b=2:10b=2:11b=2:12b=2"'';
+      F6 = ''af toggle "lavfi=[anull[a];afireqsrc=preset=custom:gains=7.2 5.6 0 -7.2 -4.8 1.6 8.0 11.2 12 12:bands=60 170 310 600 1000 3000 6000 12000 14000 16000[ir];[a][ir]afir=irgain=-4dB:irnorm=-1]"'';
+      #F7 = ''af toggle "superequalizer=1b=3:2b=4:3b=5:4b=5:5b=6:6b=7:7b=7:8b=7:9b=7:10b=7:11b=7:12b=9:13b=10:14b=10:15b=10:16b=10:17b=9:18b=8"'';
+            # Clear all audio filters & notify OSD
+      F7 = ''af clr ""; show-text "Audio Filters Cleared"'';
+      F8 = ''af toggle "superequalizer=1b=3:2b=3:3b=3:4b=1:5b=1:6b=3:7b=5:8b=7:9b=8:10b=7:11b=5:12b=3:13b=3:14b=2:15b=2:16b=2:17b=1:18b=1"'';
+      F9 = ''af toggle "superequalizer=1b=2.9:2b=0.0:3b=2.4:4b=3.3:5b=3.3:6b=3.3:7b=2.4:8b=1.4:9b=1.4:10b=1.4"'';
+      F10 = ''af toggle "superequalizer=1b=7:2b=7:3b=7:4b=5:5b=5:6b=0:7b=2:8b=7:9b=7:10b=7:11b=7:12b=7:13b=11:14b=1:15b=10:16b=10:17b=11:18b=7"'';
+      F11 = ''af toggle "superequalizer=2b=15:4b=13"'';
+      F12 = ''af toggle "superequalizer=1b=4:2b=12:4b=10:9b=10:16b=12"'';
     };
   };
 
@@ -89,6 +105,7 @@
       # Handled securely via XDG_RUNTIME_DIR socket
       mpv --input-ipc-server="$SOCKET" --quiet --geometry=75%x75% --playlist="$PLAYLIST_TMP" </dev/null>/dev/null 2>&1 &
       MPV_PID=$!
+
       sleep 0.8
       clear
       echo "========================================"
@@ -154,10 +171,10 @@
       #!/usr/bin/env bash
       SOCKET="''${XDG_RUNTIME_DIR}/mpv-socket-yuko"
       TARGET_FILE="$HOME/.cache/mpv-current-song"
-      
+
       MAX_LEN=25
       PADDING="   "
-      
+
       LAST_RAW=""
       CURRENT_SONG=""
       SCROLL_IDX=0
@@ -175,10 +192,9 @@
           if [ $CHECK_COUNTER -eq 0 ] || [ $CHECK_COUNTER -ge 5 ]; then
               CHECK_COUNTER=0
               NEW_RAW=""
-              
+
               if [ -S "$SOCKET" ]; then
                   RAW_TITLE=$(echo '{ "command": ["get_property", "media-title"] }' | ${pkgs.socat}/bin/socat - "$SOCKET" 2>/dev/null | ${pkgs.jq}/bin/jq -r '.data // empty')
-
                   if [ -n "$RAW_TITLE" ]; then
                       # Clean paths, extensions, and strip leading/trailing spaces cleanly
                       CLEAN_TITLE=$(basename "$RAW_TITLE" | sed -E 's/\.(mp3|flac|m4a|ogg|wav|mp4|m4v)$//I')
@@ -212,7 +228,7 @@
               fi
           elif [ ''${#CURRENT_SONG} -le $MAX_LEN ]; then
               # Track fits perfectly: write once, no scroll animation loop needed
-              if [ "$(cat \"$TARGET_FILE\" 2>/dev/null)" != "$CURRENT_SONG" ]; then
+              if [ "$(cat "$TARGET_FILE" 2>/dev/null)" != "$CURRENT_SONG" ]; then
                   echo "$CURRENT_SONG" > "$TARGET_FILE"
                   trigger_refresh
               fi
@@ -220,18 +236,18 @@
               # Track is too long: slice text, advance frame index, and refresh i3status
               EXTENDED="''${CURRENT_SONG}''${PADDING}''${CURRENT_SONG}''${PADDING}"
               DISPLAY_TEXT="''${EXTENDED:$SCROLL_IDX:$MAX_LEN}"
-              
+
               echo "$DISPLAY_TEXT" > "$TARGET_FILE"
               trigger_refresh
-
               ((SCROLL_IDX++))
+
               # Loop animation seamless frame calculation reset
               if [ $SCROLL_IDX -ge $((''${#CURRENT_SONG} + ''${#PADDING})) ]; then
                   SCROLL_IDX=0
               fi
           fi
 
-          sleep 0.4 # Controls the movement speed of the scrolling text on your bar
+          sleep .9 # Controls the movement speed of the scrolling text on your bar
       done
     '';
     executable = true;
@@ -244,11 +260,13 @@
       After = [ "graphical-session.target" ];
       PartOf = [ "graphical-session.target" ];
     };
+
     Service = {
       ExecStart = "${config.home.homeDirectory}/.local/bin/mpv-status-daemon";
       Restart = "always";
       RestartSec = 3;
     };
+
     Install = {
       WantedBy = [ "graphical-session.target" ];
     };

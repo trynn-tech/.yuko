@@ -1,5 +1,15 @@
 # Technical Status Update
 
+## Filters at with function keys to MPV and Synth Overview added to vincinae with pagination Alt+h and Alt+l `(=^･ω･^=)`
+Shifted system dashboard orchestration from raw `tmux` imperative script loops to declarative Zellij layout topologies (`modules/shell/zellij/default.nix`) alongside expanded audio graph tools and keyboard filter controls.
+
+- **Declarative KDL Architecture:** Built structured layout templates (`overview.kdl`) specifying exact pane geometry, process execution paths, and top-level vertical/horizontal split ratios.
+- **Dynamic Swap Layouts:** Implemented native KDL `swap_tiled_layout` blocks (`stacked_main`) to dynamically restructure focus across active system monitoring views.
+- **PipeWire Audio Control Stack:** Integrated `coppwr` (low-level PipeWire state inspector/control GUI) and `qpwgraph` (Qt-based PipeWire graph manager) for visual audio routing alongside terminal-based `pw-top`.
+- **Atomic Session Lifecycle:** Resolved nested shell issues and stale process blocks in `synth-overview` by utilizing `zellij attach --create "$SESSION"` with automated `EXITED` state cleanup.
+- **Pagination & Navigation:** Integrated `Alt+h` and `Alt+l` keybindings for fluid pagination and focused navigation across split view contexts in synth overview.
+
+
 ## Stream Intake Processing Engine (`yuko -s`) `=^._.^=`
 Added native stream intake parsing via `synth -s` to ingest, apply, and execute LLM-driven workspace mutations over standard input.
 
@@ -50,5 +60,5 @@ Gradually aligning task orchestration to feed `synth` deeper intelligence capabi
 
 * *Operational Note:* Neuromancing for the fun ... currently considor this to be a type of Front-End Operating System development
 
-_Architecture developed in with OpenAI models such as ChatGPT_
-**_Engineering and Design developed with Google models such as Gemini_**
+# _Architecture developed in with OpenAI models such as ChatGPT_
+# **_Engineering and Design developed with Google models such as Gemini_**
