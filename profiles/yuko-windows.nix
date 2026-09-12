@@ -1,18 +1,19 @@
-# profiles/yuko-core.nix
+# profiles/yuko-windows.nix
 { config, lib, pkgs, ... }:
 
 {
   imports = [
     ../modules/core
-    ../modules/programs
-    ../modules/desktop
   ];
 
   # -------------------------------
   # Global packages available to Yuko
   # -------------------------------
   home.packages = with pkgs; [
-    sonobus 
+    gnuplot # cli graphing utility
+    yt-dlp
+    handy # yuko stt
+    scope-tui
   ];
 
   # -------------------------------

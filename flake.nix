@@ -68,6 +68,12 @@
           inherit (yukoEnv) userName homeDir;
           profileModule = ./profiles/yuko-fob.nix;
         };
+
+        # Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
+        yuko-windows = mkYuko {
+          inherit (yukoEnv) userName homeDir;
+          profileModule = ./profiles/yuko-windows.nix;
+        };
       };
     };
 }

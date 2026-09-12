@@ -3,8 +3,10 @@
 
 {
   imports = [
-    ../modules/networking
     ../modules/core
+    ../modules/programs
+    ../modules/desktop
+    ../modules/networking
   ];
 
   # -------------------------------

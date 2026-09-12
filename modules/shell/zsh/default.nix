@@ -44,6 +44,7 @@ in
         cs = "cd /etc/nixos";
         ym = "yuko_snowball";
         yf = "yuko_roam";
+        yw = "yuko_windows";
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
@@ -152,6 +153,22 @@ in
               command synth "$@"
               ;;
           esac
+        }
+
+        yuko_windows() {
+          cd "${yukoFlake}" || return 1
+          if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+            echo "[yuko] updating flake inputs..."
+            nix flake update
+          fi
+
+          if command -v yuko-offline-check &>/dev/null; then
+            yuko-offline-check
+          fi
+          echo "[yuko] formatting..."
+          nix fmt . 2>/dev/null
+          echo "[yuko] activating configuration..."
+          home-manager switch -b backup --flake .#yuko-windows
         }
 
         [[ -f ${p10kPath}/powerlevel10k.zsh-theme ]] && source ${p10kPath}/powerlevel10k.zsh-theme

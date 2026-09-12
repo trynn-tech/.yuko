@@ -86,10 +86,8 @@ let
 in
 {
   imports = [
-    ../desktop
     ../dev
     ../editors
-    ../programs
     ../shell
     ../synths
   ];
