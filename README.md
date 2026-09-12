@@ -1,5 +1,46 @@
 # Technical Status Update
 
+
+## Yuko Workspace & Environment Setup For Windows 
+<!--
+ /\_/\   /\_/\   /\_/\
+( o.o ) ( =.= ) ( ^.^ )
+ > ^ <   > ^ <   > ^ <
+-->
+
+Welcome to the **Yuko Workspace**! This repository provides a fully automated, declarative provisioning pipeline for both native Windows host environments and containerized/WSL NixOS setups. Whether you are running tiling window managers on Windows or hacking inside WSL, everything is configured for maximum keyboard ergonomics and speed!
+
+---
+
+### Integration Log & Recent Changes
+* In the windows directory ...
+* **`YukoWindows.exe`**: Launch the core Windows desktop stack! Provisions and starts GlazeWM (tiling window manager), Zebar status bar, Tailscale network node, WinDirStat, and Firefox using Chocolatey.
+* **`RunYukoDeploy.exe`**: Orchestrates the main WSL environment—bootstrapping the NixOS container environment and syncing home profile modules seamlessly. To be run if you want the WSL nixos virtual machine alone without additional Window's gui applications
+* **WSL Tmux Local Services Integration**: Automated background startup script that initializes local developer services inside your terminal environment upon session start:
+* **LocalAI API**: Ready and active at `http://localhost:8081`
+* **SearXNG Metasearch Engine**: Ready and active at `http://localhost:8888`
+
+---
+
+### Surfingkeys for Firefox
+
+[Surfingkeys](https://github.com/brookhong/Surfingkeys) is a modal keyboard navigation extension that brings pure Vim-like navigation to Firefox! With custom JavaScript configurations, you can navigate without touching the mouse, trigger customized link hints, and interface directly with local media tools.
+
+#### Key Mappings Cheat Sheet
+
+* **`?`**: Trigger visual hints.
+
+---
+
+### How to Load `surfingkeys.js` into Firefox
+
+Linking your declarative `modules/programs/firefox/surfingkeys.js` configuration to Firefox takes just a few seconds:
+
+1. **Open Extension Options** *(10s)*: Open Firefox, press `Ctrl + Shift + A` to open **Add-ons and Themes**, and ensure **Surfingkeys** is installed. Type `;e` in any active tab or click the extension icon to open the settings panel.
+2. **Import Your Configuration** *(15s)*: Copy the complete contents of `modules/programs/firefox/surfingkeys.js` from your local repo and paste it into the main code editor in the Surfingkeys settings page.
+3. **Save and Apply** *(5s)*: Click **Save** at the bottom right of the page. Your custom *Cyber Rosé Pine* theme and custom keybindings will take effect across all browser tabs immediately!
+
+
 ## Filters at with function keys to MPV and Synth Overview added to vincinae with pagination Alt+h and Alt+l `(=^･ω･^=)`
 Shifted system dashboard orchestration from raw `tmux` imperative script loops to declarative Zellij layout topologies (`modules/shell/zellij/default.nix`) alongside expanded audio graph tools and keyboard filter controls.
 
