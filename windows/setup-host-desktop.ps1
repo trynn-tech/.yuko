@@ -3,28 +3,43 @@
 # =====================================================================
 Write-Host "=== STAGING HOST WINDOWS ENVIRONMENT ===" -ForegroundColor Magenta
 
-# --- Stage 1: Native Package Installation ---
-Write-Host "`n[*] Provisioning packages via winget & scoop..." -ForegroundColor Yellow
-$packages = @(
-    "glaze-wm.glazewm",
-    "glaze-wm.zebar",
-    "Tailscale.Tailscale",
-    "WinDirStat.WinDirStat",
-    "Mozilla.Firefox"
-)
-
-foreach ($pkg in $packages) {
-    Write-Host " -> Installing $pkg..." -ForegroundColor Cyan
-    winget install --id $pkg -e --accept-package-agreements --accept-source-agreements --silent
+# --- Ensure Chocolatey is Installed ---
+if (-not (Get-Command "choco" -ErrorAction SilentlyContinue)) {
+    Write-Host "[*] Installing Chocolatey package manager..." -ForegroundColor Yellow
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 }
 
-if (-not (Get-Command "microwin" -ErrorAction SilentlyContinue)) {
-    Write-Host " -> Installing MicroWin via Scoop..." -ForegroundColor Cyan
-    if (-not (Get-Command "scoop" -ErrorAction SilentlyContinue)) {
-        Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+# --- Stage 1: Native Package Installation via Chocolatey ---
+Write-Host "`n[*] Provisioning packages via Chocolatey..." -ForegroundColor Yellow
+
+$chocoPackages = @(
+    "glazewm",
+    "zebar",
+    "tailscale",
+    "windirstat",
+    "firefox"
+)
+
+foreach ($pkg in $chocoPackages) {
+    Write-Host " -> Installing $pkg via Choco..." -ForegroundColor Cyan
+    # -y auto-approves prompts; --no-progress prevents pipe output crashes
+    choco install $pkg -y --no-progress
+    
+    # Verify execution status
+    if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 3010) {
+        Write-Host "    └─ $pkg installed successfully." -ForegroundColor Green
+    } else {
+        Write-Host "    └─ Failed to install $pkg (Exit Code: $LASTEXITCODE)." -ForegroundColor Red
     }
-    scoop bucket add extras 2>$null
-    scoop install microwin
+}
+
+# Optional Scoop utility check
+if (Get-Command "scoop" -ErrorAction SilentlyContinue) {
+    if (-not (Get-Command "microwin" -ErrorAction SilentlyContinue)) {
+        Write-Host " -> Installing MicroWin via Scoop..." -ForegroundColor Cyan
+        scoop install microwin
+    }
 }
 
 # --- Stage 2: Firefox Enterprise Policies & Extensions ---
@@ -161,16 +176,3 @@ user_pref("browser.tabs.crashReporting.sendReport", false);
     Set-Content -Path $userJsPath -Value $userJsContent -Encoding UTF8
     Write-Host "✔ Firefox preferences mapped." -ForegroundColor Green
 }
-
-# --- Stage 4: Shell Integration Context Menu ---
-Write-Host "`n[*] Registering 'Edit in NixVim' context menu..." -ForegroundColor Yellow
-$regPath = "HKCU:\Software\Classes\*\shell\NixVim"
-New-Item -Path $regPath -Force | Out-Null
-Set-ItemProperty -Path $regPath -Name "(Default)" -Value "Edit in NixVim"
-Set-ItemProperty -Path $regPath -Name "Icon" -Value "wt.exe"
-
-$cmdPath = "$regPath\command"
-New-Item -Path $cmdPath -Force | Out-Null
-$nixvimCmd = 'wt.exe wsl -d NixOS -u nixos zsh -c "nvim `$(wslpath ''%1'')" '
-Set-ItemProperty -Path $cmdPath -Name "(Default)" -Value $nixvimCmd
-Write-Host "✔ Registered context menu handler." -ForegroundColor Green

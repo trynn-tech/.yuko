@@ -56,11 +56,19 @@ New-Item -Path $cacheDir -ItemType Directory -Force | Out-Null
 $nixosWslTarget = "$env:USERPROFILE\Desktop\nixos.wsl"
 $escapedCacheTarget = $nixosWslTarget.Replace('\', '/')
 
+$nixosWslTarget = "$env:USERPROFILE\Desktop\nixos.wsl"
+$escapedCacheTarget = $nixosWslTarget.Replace('\', '/')
+
+# Pass the destination path safely via environment variables to bypass PowerShell here-string limits
+$env:TARGET_WSL_DEST = $escapedCacheTarget
+
 # =====================================================================
 # STAGE 3: STREAM CORE IMAGE VIA PLAYWRIGHT
 # =====================================================================
 Write-Host "`n[3/5] Spawning Automated Browser Process to Stream Core Image Bundle..." -ForegroundColor Cyan
-$pythonBrowserCode = @"
+
+# Use literal single-quoted here-string; os.environ fetches the path in Python
+$pythonBrowserCode = @'
 import sys
 import os
 import multiprocessing
@@ -68,6 +76,7 @@ from playwright.sync_api import sync_playwright
 
 def browser_task():
     print("    [*] Starting browser process virtualization hooks...")
+    target_dest = os.environ.get("TARGET_WSL_DEST")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
@@ -83,7 +92,7 @@ def browser_task():
                     if "net::ERR_ABORTED" not in str(e) and "Download is starting" not in str(e):
                         raise e
             download = download_info.value
-            download.save_as('$escapedCacheTarget')
+            download.save_as(target_dest)
             print("✔ Automated browser file transfer completed successfully.")
         except Exception as err:
             print(f"❌ Failed to stream NixOS image: {err}")
@@ -98,7 +107,7 @@ if __name__ == '__main__':
     p.join()
     if p.exitcode != 0: sys.exit(1)
     sys.exit(0)
-"@
+'@
 
 $pyScriptPath = "$env:TEMP\browser_master_stream.py"
 Set-Content -Path $pyScriptPath -Value $pythonBrowserCode -Force
@@ -132,6 +141,7 @@ Write-Host "✔ NixOS machine mapping fully active." -ForegroundColor Green
 # =====================================================================
 Write-Host "[*] Provisioning system configuration as 'root'..." -ForegroundColor Yellow
 
+# Pure literal here-string prevents early variable resolution
 $rootScript = @'
 #!/usr/bin/env bash
 [ -f /etc/profile ] && . /etc/profile
@@ -162,7 +172,8 @@ let
     name = "gpt-5";
     backend = "llama-cpp";
     parameters = {
-      model = "blobs/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf";
+      # Point to the first shard; llama.cpp automatically binds 00002-of-00002
+      model = "blobs/qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf";
       context_size = 8192;
       gpu_layers = -1;
       temperature = 0.1;
@@ -199,7 +210,7 @@ in {
 
   systemd.services.provision-re-l-models = {
     description = "Declarative Model Provisioning Guard";
-    path = [ pkgs.wget pkgs.coreutils ];
+    path = [ pkgs.curl pkgs.wget pkgs.coreutils ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig.Type = "oneshot";
     script = ''
@@ -207,15 +218,23 @@ in {
       rm -f ${modelDir}/*.yaml
 
       TARGET_PHI="${modelDir}/blobs/Phi-3.5-mini-instruct-Q4_K_M.gguf"
-      if [ ! -f "$TARGET_PHI" ]; then
+      if [ ! -s "$TARGET_PHI" ]; then
         echo "Downloading Phi-3.5-mini-instruct GGUF..."
-        wget -O "$TARGET_PHI" "https://huggingface.co" || true
+        rm -f "$TARGET_PHI"
+        curl -sSL -A "Mozilla/5.0" -o "$TARGET_PHI" "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf" || true
       fi
 
-      TARGET_QWEN="${modelDir}/blobs/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf"
-      if [ ! -f "$TARGET_QWEN" ]; then
-        echo "Downloading Qwen2.5-Coder-7B-Instruct Q5_K_M GGUF..."
-        wget -O "$TARGET_QWEN" "https://huggingface.co" || true
+      SHARD1="${modelDir}/blobs/qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf"
+      SHARD2="${modelDir}/blobs/qwen2.5-coder-7b-instruct-q5_k_m-00002-of-00002.gguf"
+
+      if [ ! -s "$SHARD1" ]; then
+        echo "Downloading Qwen2.5-Coder shard 1 of 2..."
+        curl -sSL -A "Mozilla/5.0" -o "$SHARD1" "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q5_k_m-00001-of-00002.gguf?download=true" || true
+      fi
+
+      if [ ! -s "$SHARD2" ]; then
+        echo "Downloading Qwen2.5-Coder shard 2 of 2..."
+        curl -sSL -A "Mozilla/5.0" -o "$SHARD2" "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q5_k_m-00002-of-00002.gguf?download=true" || true
       fi
 
       cp -f ${activeYaml} ${modelDir}/gpt-5.yaml
@@ -319,16 +338,19 @@ in
     isNormalUser = true;
     description = "nixos";
     group = "users";
-    shell = pkgs.bashInteractive;
+    shell = pkgs.zsh;
     extraGroups = [ "wheel" "networkmanager" "docker" ];
   };
 
   environment.systemPackages = with pkgs; [ git wget curl wsl-open shadow ];
 
+  programs.zsh.enable = true;
+
   programs.nix-ld.enable = true;
   environment.variables = lib.mkForce {
     NIX_LD_LIBRARY_PATH = "/usr/lib/wsl/lib/";
     NIX_LD = "${pkgs.glibc}/lib/ld-linux-x86-64.so.2";
+    NIX_CURL_FLAGS = "-A NixOS/24.11";
   };
 
   system.stateVersion = "24.11";
@@ -341,15 +363,18 @@ echo 'experimental-features = nix-command flakes' > ~/.config/nix/nix.conf
 
 echo '[*] Configuring channel environments...'
 
-nix-channel --add https://nixos.org/channels/nixos-24.11 nixos
+sudo nix-channel --add https://nixos.org/channels/nixos-24.11 nixos
+sudo nix-channel --add https://nixos.org/channels/nixos-24.11 nixpkgs
+sudo nix-channel --add https://github.com/nix-community/NixOS-WSL/archive/refs/heads/release-24.11.tar.gz nixos-wsl
+sudo nix-channel --update
 
-nix-channel --update nixos
+# Re-run system rebuild
+sudo NIX_CURL_FLAGS="-A NixOS/24.11" nixos-rebuild switch
+
 '@
 
-# https://github.com/arcnmx/nixexprs.git add to satisfy nix-channel update requirement
-# Directly pipe sanitized string into WSL Bash via Standard Input
-$cleanRootScript = $rootScript.Replace("`r`n", "`n").Replace("`r", "")
-$cleanRootScript | wsl -d NixOS -u root -- bash
+# Pipe directly into WSL safely using stdin
+$rootScript | wsl -d NixOS -u root -- bash -c "tr -d '\r' | bash"
 
 # Reboot container layer to release state
 Write-Host "[*] Cycling WSL engine to release mount state..." -ForegroundColor Yellow
@@ -401,16 +426,16 @@ nix --extra-experimental-features 'nix-command flakes' run \
   github:NixOS/nixpkgs/nixos-24.11#git -- add flake.lock
 
 echo '[*] Executing transient Home-Manager runtime switch via Flakes engine...'
-nix --extra-experimental-features 'nix-command flakes' run github:nix-community/home-manager/release-24.11 -- switch -b backup --flake .#yuko-core
+nix --extra-experimental-features 'nix-command flakes' run github:nix-community/home-manager/release-24.11 -- switch -b backup --flake .#yuko-windows
 
 echo '==================================================='
 echo '(=^･-･^=) All Systems Operating and Configured Natively!'
 echo '==================================================='
+
 '@
 
-$cleanUserScript = [regex]::Replace($userScript, "[\u00A0\u2000-\u200B]", " ")
-$cleanUserScript = $cleanUserScript.Replace("`r`n", "`n").Replace("`r", "")
-$cleanUserScript | wsl -d NixOS -u nixos -- bash
+# Strip carriage returns on execution to prevent $'\r' syntax faults
+$userScript | wsl -d NixOS -u nixos -- bash -c "tr -d '\r' | bash"
 
 # =====================================================================
 # STAGE 6: WINDOWS INTEGRATION & SHORTCUT PROVISIONING
