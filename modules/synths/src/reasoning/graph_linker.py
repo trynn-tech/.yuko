@@ -141,6 +141,7 @@ class KnowledgeGraphLinker:
         result_data = {
             "files": [],
             "functions": [],
+            # TODO: Correct class here and then we will look into prepping hunk diff interface in prep for yield method [0d589831-2d53-49f7-bd0a-8eb2cdfdc458]
             "classes": [],
             "related_tags": [],
         }

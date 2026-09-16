@@ -1,13 +1,3 @@
-  const url = window.location.href;
-
-  if (!/(^https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(url)) {
-    api.Front.showPopup('Not a YouTube page');
-    return;
-  }
-
-  window.location.href = `freetube://${url}`;
-});
-
 api.mapkey('F', 'Open a hinted YouTube link in FreeTube', () => {
   api.Hints.create('', (element) => {
     const url = element.href;
@@ -23,9 +13,9 @@ api.mapkey('F', 'Open a hinted YouTube link in FreeTube', () => {
 
 // Navigation & Key Mappings
  api.map('on', 't');
- api.map('T', 't');
- api.map('t', 'on');
-api.map('M', 'om');
+ api.map('t', 'T');
+ api.map('T', 'on');
+ api.map('M', 'om');
 
 // Ergonomic Key Overrides
 api.unmap('u');
@@ -479,3 +469,4 @@ settings.theme = `
     }
   }
 `;
+

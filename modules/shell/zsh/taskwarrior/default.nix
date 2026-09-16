@@ -17,6 +17,7 @@ let
         "system": 4,
         "yuko": 4,
         "life": 3,
+	"code":3,
         "radiant": 2,
         "re-l": 2,
     }
@@ -99,9 +100,9 @@ in
       package = pkgs.taskwarrior3;
       extraConfig = ''
         data.location=~/.local/share/task
-        sync.server.url=http://100.78.85.44:8080
-        sync.server.client_id=58f0b3c8-9c13-427d-8921-1cebfe441a70
-        sync.encryption_secret=HelloInternet42!
+        sync.server.url=http://100.89.245.52:8080
+        sync.server.client_id=26f9fe2a-00c0-4897-bb2a-dd556ded62c1
+        sync.encryption_secret=HelloInternet42!Secure
         confirmation=no
         dependency.confirmation=no
         recurrence.confirmation=no
@@ -144,12 +145,12 @@ in
           fi
           echo -e "\n\033[1;35m--- Next Inbox Item ---\033[0m"
           ${taskBin} "$id" info
-          echo -e "\n\033[1;36mMAP:\033[0m [s] system | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
+          echo -e "\n\033[1;36mMAP:\033[0m [c] code | [s] system | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
           echo -n "🚀 Move to (Key/Name/q): "
           read input
           [[ "$input" == "q" ]] && break
           case "$input" in
-            s) proj="system" ;; t) proj="technical" ;; w) proj="re-l" ;;
+            f) proj="code" ;; s) proj="system" ;; t) proj="technical" ;; w) proj="re-l" ;;
             e) proj="emporium" ;; l) proj="life" ;; r) proj="radiant" ;;
             y) proj="yuko" ;; *) proj="$input" ;;
           esac
@@ -261,7 +262,7 @@ in
         report
       }
 
-      for entry in "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
+      for entry in "f:code" "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
         key="''${entry%%:*}"; name="''${entry#*:}"
         alias "''${key}c"="_proj $name c"
         alias "''${key}r"="_proj $name r"

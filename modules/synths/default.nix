@@ -21,12 +21,18 @@ let
     gitpython
     pydantic
     rapidfuzz
+
+    # Treesitter
     tree-sitter
     tree-sitter-grammars.tree-sitter-nix
     tree-sitter-grammars.tree-sitter-python
     tree-sitter-grammars.tree-sitter-bash
     tree-sitter-grammars.tree-sitter-c
+
+
+    # TUI
     rich
+    textual
 
     # Math & Vector Primitives
     numpy
@@ -55,22 +61,31 @@ let
     version = "0.1.0";
     src = ./.;
     nativeBuildInputs = [ pkgs.makeWrapper ];
+
     installPhase = ''
       mkdir -p $out/libexec/synth-engine $out/bin
 
-      # Copy src and tests into libexec
       if [ -d src ]; then
         cp -r src/* $out/libexec/synth-engine/
       else
         cp -r * $out/libexec/synth-engine/
       fi
 
-      if [ -d tests ]; then
-        cp -r tests $out/libexec/synth-engine/
-      fi
-
+      # Primary CLI Engine
       makeWrapper ${pythonEnv}/bin/python $out/bin/synth \
         --add-flags "$out/libexec/synth-engine/main.py" \
+        --set PYTHONPATH "$out/libexec/synth-engine" \
+        --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
+
+      # CLI Editor Binary
+      makeWrapper ${pythonEnv}/bin/python $out/bin/synth-editor \
+        --add-flags "$out/libexec/synth-engine/editor/cli_editor.py" \
+        --set PYTHONPATH "$out/libexec/synth-engine" \
+        --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
+
+      # Interactive Textual TUI Binary
+      makeWrapper ${pythonEnv}/bin/python $out/bin/synth-tui \
+        --add-flags "$out/libexec/synth-engine/editor/tui_editor.py" \
         --set PYTHONPATH "$out/libexec/synth-engine" \
         --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
     '';

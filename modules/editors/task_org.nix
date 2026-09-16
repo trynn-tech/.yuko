@@ -40,7 +40,7 @@
               current_file_uuids[uuid] = true
             end
 
-            -- Match lines containing `# TODO:`
+            -- Match lines containing `# TODO:` [90173c7f-53b4-4a8f-9126-4556b0626804]
             if line:match("#%s*[Tt][Oo][Dd][Oo]:") then
               if uuid then
                 -- Already tracked, keep as is

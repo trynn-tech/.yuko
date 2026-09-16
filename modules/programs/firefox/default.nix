@@ -132,6 +132,7 @@ in
         auto-tab-discard
         darkreader
         surfingkeys
+	violentmonkey
       ];
     };
   };
