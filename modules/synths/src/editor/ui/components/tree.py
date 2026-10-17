@@ -1,7 +1,9 @@
 # editor/ui/components/tree.py
 from typing import Optional
+
 from textual.binding import Binding
 from textual.widgets import Tree
+from textual.widgets.tree import TreeNode
 
 
 class NavigableTree(Tree):
@@ -15,39 +17,39 @@ class NavigableTree(Tree):
     ]
 
     def jump_to_block_id(self, target_id: int) -> bool:
-        """Finds, expands, highlights, and scrolls to a block by its identifier.
-        
-        Returns True if a match was successfully found and focused.
+        """Expands, highlights and scrolls to the AST block node with this index.
+
+        Moves the cursor only (no NodeSelected message); the caller is responsible
+        for selecting the block, which keeps behaviour deterministic.
         """
-        def find_block_node(parent_node) -> Optional[Tree]:
-            if hasattr(parent_node, "data") and parent_node.data == target_id:
-                return parent_node
-                
-            if str(parent_node.label).strip().endswith(str(target_id)):
-                return parent_node
-                
-            for child in parent_node.children:
-                result = find_block_node(child)
-                if result:
-                    return result
+
+        def find(node: TreeNode) -> Optional[TreeNode]:
+            data = node.data
+            if isinstance(data, int) and not isinstance(data, bool) and data == target_id:
+                return node
+            for child in node.children:
+                hit = find(child)
+                if hit:
+                    return hit
             return None
 
-        target_node = find_block_node(self.root)
+        target = find(self.root)
+        if target is None:
+            return False
 
-        if target_node:
-            # Expand lineage from target up to the root container path
-            current = target_node.parent
-            while current:
-                current.expand()
-                current = current.parent
-                
-            # Perform selection and invoke viewport scrolling safely on self
-            self.select_node(target_node)
-            self.scroll_to_node(target_node)
-            self.focus()
-            return True
-            
-        return False
+        ancestor = target.parent
+        while ancestor:
+            ancestor.expand()
+            ancestor = ancestor.parent
+
+        # Line numbers are only valid after the expanded tree has been re-laid out.
+        def _reveal() -> None:
+            self.move_cursor(target)
+            self.scroll_to_node(target)
+
+        self.call_after_refresh(_reveal)
+        self.focus()
+        return True
 
     def action_prev_category(self) -> None:
         node = self.cursor_node
@@ -74,8 +76,7 @@ class NavigableTree(Tree):
                 self.select_node(node.children[0])
             return
         elif node.parent and node.parent != self.root:
-            parent_children = node.parent.children
-            idx = parent_children.index(node)
-            if idx < len(parent_children) - 1:
-                self.select_node(parent_children[idx + 1])
-
+            siblings = node.parent.children
+            idx = siblings.index(node)
+            if idx < len(siblings) - 1:
+                self.select_node(siblings[idx + 1])

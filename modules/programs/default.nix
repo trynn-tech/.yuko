@@ -27,7 +27,7 @@
     coppwr # A low-level PipeWire object and parameter explorer
     gnuplot # cli graphing utility
     yt-dlp
-    scrcpy # Remote Android control
+    scrcpy # Remote android control
   ];
 
 }

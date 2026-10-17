@@ -308,7 +308,8 @@ class ModularBlockEditor:
                 ]
                 lines[s_idx:e_idx] = indented
 
-        self.raw_code = "\n".join(lines)
+        trailing_newline = self.raw_code.endswith("\n")
+        self.raw_code = "\n".join(lines) + ("\n" if trailing_newline else "")
         self.mutation_buffer.clear()
         self.parse_document()
         return self.raw_code

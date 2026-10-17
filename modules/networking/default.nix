@@ -6,5 +6,6 @@
     ./openwrt-provision.nix
     ./construct.nix
     ./teardown.nix
+    #./tun2socks.nix see dev note in source code
   ];
 }

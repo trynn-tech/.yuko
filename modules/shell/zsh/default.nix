@@ -44,7 +44,6 @@ in
         cs = "cd /etc/nixos";
         ym = "yuko_snowball";
         yf = "yuko_roam";
-        ymf = "yuko_mobile_roam";
         yw = "yuko_windows";
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
@@ -116,6 +115,14 @@ in
 
         yuko_roam() {
           cd "${yukoFlake}" || return 1
+          
+          # --- OFFLINE MODEM / PROXY REMINDER HOOK ---
+          echo -e "\n\033[1;35m⚙️  [yuko-network] Split-Tunneling Reference:\033[0m"
+          echo -e "   -> \033[1;33mtun2socks:\033[0m Manage state cleanly via \033[1;36msystemctl --user [start|stop] tun2socks\033[0m"
+          echo -e "   -> \033[1;33mModem Conjunction:\033[0m To avoid routing loops, map your proxy server's target"
+          echo -e "      IP destination explicitly down your physical WAN card interface (\033[1;32mvm-fob-wan\033[0m)."
+          echo -e "   -> Alternatively, bind the modem to your running OpenWrt sandbox for full isolation.\n"
+
           if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
             echo "[yuko] updating flake inputs..."
             nix flake update
@@ -130,21 +137,6 @@ in
           home-manager switch -b backup --flake .#yuko-fob
         }
 
-	yuko_mobile_roam() {
-          cd "${yukoFlake}" || return 1
-          if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
-            echo "[yuko] updating flake inputs..."
-            nix flake update
-          fi
-
-          if command -v yuko-offline-check &>/dev/null; then
-            yuko-offline-check
-          fi
-          echo "[yuko] formatting..."
-          nix fmt . 2>/dev/null
-          echo "[yuko] activating configuration..."
-          home-manager switch -b backup --flake .#yuko-mobile-fob
-        }
 
         alias -g mew="2>&1 | tee /dev/tty | xclip -sel clip"
 

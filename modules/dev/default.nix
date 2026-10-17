@@ -13,5 +13,7 @@
     gdb
     nix-index
     nix-alien
+    gcc
+    gnumake
   ];
 }
