@@ -1,11 +1,13 @@
-# modules/shell/zsh/taskwarrior.nix
+# modules/shell/zsh/taskwarrior/default.nix
 { config, lib, pkgs, ... }:
 
 let
   taskBin = "${pkgs.taskwarrior3}/bin/task";
 
-  taskCarouselScript = pkgs.writeText "task-carousel.py" ''
-    #!/usr/bin/env python3
+  taskCarousel = pkgs.writers.writePython3Bin "task-carousel" {
+    libraries = [];
+    doCheck = false;
+  } ''
     import sys
     import json
     import random
@@ -17,7 +19,6 @@ let
         "system": 4,
         "yuko": 4,
         "life": 3,
-	"code":3,
         "radiant": 2,
         "re-l": 2,
     }
@@ -28,9 +29,7 @@ let
 
     def main():
         today_str = datetime.now().strftime("%Y-%m-%d")
-
         status = run_cmd(["rc.verbose=nothing", "rc.hooks=off", "+carousel_tracker", "export"])
-
         if status:
             try:
                 tasks = json.loads(status)
@@ -54,12 +53,6 @@ let
     if __name__ == "__main__":
         main()
   '';
-
-  taskCarousel = pkgs.writers.writePython3Bin "task-carousel" {
-    libraries = [];
-    doCheck = false;
-  } (builtins.readFile taskCarouselScript);
-
 in
 {
   options.yuko.shell.taskwarrior.enable = lib.mkEnableOption "Taskwarrior shell integration and tooling";
@@ -100,9 +93,12 @@ in
       package = pkgs.taskwarrior3;
       extraConfig = ''
         data.location=~/.local/share/task
+
+        # Taskwarrior Sync Server Configuration
         sync.server.url=http://100.89.245.52:8080
-        sync.server.client_id=26f9fe2a-00c0-4897-bb2a-dd556ded62c1
-        sync.encryption_secret=HelloInternet42!Secure
+        sync.server.client_id=44f0b3c8-9c13-427d-8921-1cebfe441a70
+        sync.encryption_secret=HelloInternet42!
+
         confirmation=no
         dependency.confirmation=no
         recurrence.confirmation=no
@@ -145,12 +141,12 @@ in
           fi
           echo -e "\n\033[1;35m--- Next Inbox Item ---\033[0m"
           ${taskBin} "$id" info
-          echo -e "\n\033[1;36mMAP:\033[0m [c] code | [s] system | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
+          echo -e "\n\033[1;36mMAP:\033[0m [s] system | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
           echo -n "🚀 Move to (Key/Name/q): "
           read input
           [[ "$input" == "q" ]] && break
           case "$input" in
-            f) proj="code" ;; s) proj="system" ;; t) proj="technical" ;; w) proj="re-l" ;;
+            s) proj="system" ;; t) proj="technical" ;; w) proj="re-l" ;;
             e) proj="emporium" ;; l) proj="life" ;; r) proj="radiant" ;;
             y) proj="yuko" ;; *) proj="$input" ;;
           esac
@@ -162,13 +158,11 @@ in
         local taskBin="''${TASKWARIOR_BIN:-task}"
         local target_project="''${1:-}"
         local -a filter_args=()
-
         if [[ -n "''${target_project}" ]]; then
           filter_args=( "project:''${target_project}" "+READY" )
         else
           filter_args=( "+inbox" "+READY" )
         fi
-
         local -a skipped_ids=()
         while true; do
           local id=""
@@ -176,10 +170,8 @@ in
           for skip_id in ''${skipped_ids[@]}; do
             exclude_args+=( "id.not:''${skip_id}" )
           done
-
           id="$( ''${taskBin} ''${filter_args[@]} sort:priority- ''${exclude_args[@]} _ids 2>/dev/null | head -n 1 )"
           id="''${id//[[:space:]]/}"
-
           clear
           echo -e "\033[1;33m==== CONTROLLER ARRAY DIAGNOSTICS ====\033[0m"
           echo "Target Filter                   : ''${target_project:-inbox}"
@@ -187,7 +179,6 @@ in
           echo "Skipped IDs Array Elements     : ''${skipped_ids[@]}"
           echo "Generated Individual Tokens    : ''${exclude_args[@]}"
           echo -e "\033[1;33m======================================\033[0m\n"
-
           if [[ -z "''${id}" ]]; then
             if [[ -n "''${target_project}" ]]; then
               echo -e "\033[1;32m✅ Triage complete for project: ''${target_project}!\033[0m"
@@ -196,20 +187,16 @@ in
             fi
             break
           fi
-
           echo -e "\033[1;35m--- Next Item: ''${id} ---\033[0m"
           ''${taskBin} "''${id}" info
           echo -e "\n\033[1;36mPRIORITY:\033[0m [H] High | [M] Medium | [L] Low | [Enter] Advance/Skip | [Q] Quit"
           echo -n "🚀 Select option (h/m/l/Enter/q): "
-
           local input=""
           read -r input < /dev/tty
           local action="''${input:u}"
-
           if [[ "''${action}" == "Q" ]]; then
             break
           fi
-
           case "''${action}" in
             H|M|L)
               ''${taskBin} "''${id}" modify priority:"''${action}" >/dev/null 2>&1
@@ -262,11 +249,11 @@ in
         report
       }
 
-      for entry in "f:code" "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
+      for entry in "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
         key="''${entry%%:*}"; name="''${entry#*:}"
         alias "''${key}c"="_proj $name c"
         alias "''${key}r"="_proj $name r"
-        alias "''${key}x"="_ctx $name"
+        alias "''${key}f"="_ctx $name"
         alias "''${key}u"="_proj $name u"
         alias "''${key}d"="_proj $name d"
       done
@@ -274,7 +261,6 @@ in
       alias cx="${taskBin} context none && clear && echo -e '\033[1;32mContext Cleared\033[0m'"
       alias review='${taskBin} status:pending age.gt:2w list'
       alias tll='${taskBin} summary; echo -e "\n--- GAPS ---"; ${taskBin} gprojects'
-
       compdef _task ${taskBin}
     '';
   };

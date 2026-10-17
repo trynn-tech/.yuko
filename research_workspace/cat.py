@@ -15,7 +15,7 @@ def create_unimatrix(num_cats):
     return unimatrix
 
 def main():
-    num_cats = 10  # You can change this number to generate more or fewer cats
+    num_cats = 21  # You can change this number to generate more or fewer cats
     unimatrix = create_unimatrix(num_cats)
     for cat in unimatrix:
         print(cat)

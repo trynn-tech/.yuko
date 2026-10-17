@@ -1,8 +1,12 @@
-#!/usr/bin/env python3emed
+#!/usr/bin/env python3
 # modules/synths/src/reasoning/embedder.py
 
+import os
 import logging
 from typing import List, Union
+
+# Automatically enforce offline Hugging Face mode to prevent DNS lookup hangs
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -17,7 +21,7 @@ class FeatureEmbedder:
     """Encoder-only Transformer node (CodeBERT / nomic-embed-text).
 
     Rapidly vectorizes code functions, markdown chunks, and prompts into 768-dim
-    embeddings.
+    embeddings entirely offline.
     """
 
     def __init__(self, model_name: str = "nomic-ai/nomic-embed-text-v1.5"):
@@ -31,18 +35,27 @@ class FeatureEmbedder:
                     "sentence-transformers is required for vector embeddings. "
                     "Ensure it is available in your Nix environment."
                 )
-            # Load with FP16 to keep memory footprint under 500MB VRAM
-            self._model = SentenceTransformer(self.model_name, trust_remote_code=True)
+            try:
+                # Force local-only loading so it bypasses remote HEAD checks completely
+                self._model = SentenceTransformer(
+                    self.model_name, 
+                    local_files_only=True, 
+                    trust_remote_code=True
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to load model with local_files_only=True (%s). "
+                    "Attempting fallback load...", e
+                )
+                self._model = SentenceTransformer(self.model_name, trust_remote_code=True)
 
     def encode(self, text: Union[str, List[str]], task_type: str = "search_document") -> List[List[float]]:
-        """Encodes text. task_type should be 'search_document' for code, 'search_query' for prompts."""
+        """Encodes text locally without network calls."""
         self._lazy_load()
         if isinstance(text, str):
             text = [text]
             
-        # Nomic v1.5 requires specific task prefixes for accurate retrieval
         prefixed_text = [f"{task_type}: {t}" for t in text]
-        
         embeddings = self._model.encode(prefixed_text, normalize_embeddings=True)
         return embeddings.tolist()
 

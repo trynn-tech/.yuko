@@ -119,6 +119,11 @@ class Executor:
             )
         return str(fpath), str(search), str(replace)
 
+    def apply_anchor_edit(
+            self, filepath: str, search_anchor: str, replace_block: str
+        ) -> bool:
+            """Alias for apply_resilient_edit for full compatibility with ArchitectCoordinator."""
+            return self.apply_resilient_edit(filepath, search_anchor, replace_block)
 
     def apply_resilient_edit(
         self, filepath: str, search_anchor: str, replace_block: str

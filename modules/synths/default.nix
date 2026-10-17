@@ -17,49 +17,74 @@ let
     podman
   ];
 
+  textual-vim = pkgs.python3Packages.buildPythonPackage rec {
+    pname = "textual-vim";
+    version = "0.1.0";
+    
+    pyproject = true;
+
+    src = pkgs.fetchFromGitHub {
+      owner = "davidbrochart";
+      repo = "textual-vim";
+      rev = "v${version}";
+      
+      # Forces Nix to clone the git repository directly without using a tarball URL
+      forceFetchGit = true; 
+      
+      # Throw an intentional fake hash structure to capture the true git directory layout hash
+      hash = "sha256-oi8s4iotR9wkZmQz7lJd60n/uo2wEOrZKzLHYWOph2g=";
+    };
+
+    "build-system" = [
+      pkgs.python3Packages.hatchling
+    ];
+
+    propagatedBuildInputs = with pkgs.python3Packages; [
+      textual
+      pyte
+    ];
+
+    doCheck = false;
+  };
+
   pythonEnv = pkgs.python3.withPackages (ps: with ps; [
     gitpython
     pydantic
     rapidfuzz
-
     # Treesitter
     tree-sitter
     tree-sitter-grammars.tree-sitter-nix
     tree-sitter-grammars.tree-sitter-python
     tree-sitter-grammars.tree-sitter-bash
     tree-sitter-grammars.tree-sitter-c
-
-
     # TUI
     rich
     textual
-
+    textual-vim
     # Math & Vector Primitives
     numpy
-
     # Testing & Coverage
     pytest
     pytest-cov
-
     # Network
     httpx
-
     # Memory & Graph Connectors
     redis
     neo4j
     sentence-transformers
     einops
-
     # RAPTOR & Clustering Pipeline
     umap-learn
     scikit-learn
     numba
   ]);
 
+
   synthPackage = pkgs.stdenv.mkDerivation {
     pname = "local-synth-engine";
     version = "0.1.0";
     src = ./.;
+
     nativeBuildInputs = [ pkgs.makeWrapper ];
 
     installPhase = ''
@@ -83,9 +108,9 @@ let
         --set PYTHONPATH "$out/libexec/synth-engine" \
         --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
 
-      # Interactive Textual TUI Binary
+      # Interactive Textual TUI Binary (Direct UI module execution)
       makeWrapper ${pythonEnv}/bin/python $out/bin/synth-tui \
-        --add-flags "$out/libexec/synth-engine/editor/tui_editor.py" \
+        --add-flags "$out/libexec/synth-engine/editor/ui/app.py" \
         --set PYTHONPATH "$out/libexec/synth-engine" \
         --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
     '';
@@ -94,16 +119,21 @@ let
 in {
   options.yuko.synths = {
     enable = lib.mkEnableOption "Custom Nix-bound local AI editing engine";
+
     apiBase = lib.mkOption {
       type = lib.types.str;
       default = "http://localhost:8081/v1";
       description = "The root system API endpoint for local containerized inference models.";
     };
-    modelName = lib.mkOption {      type = lib.types.str;
+
+    modelName = lib.mkOption {
+      type = lib.types.str;
       default = "architect";
       description = "The target model identifier currently warm in VRAM.";
     };
-    searxngBase = lib.mkOption {      type = lib.types.str;
+
+    searxngBase = lib.mkOption {
+      type = lib.types.str;
       default = "http://localhost:8888";
       description = "The unified network address of the system-level SearXNG discovery engine.";
     };

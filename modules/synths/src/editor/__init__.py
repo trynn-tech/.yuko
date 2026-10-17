@@ -1,6 +1,6 @@
-"""
-Modular Block & Stage Editor (Frag Engine Interface)
-"""
+"""modules/synths/src/editor/__init__"""
+
+"""Modular Block & Stage Editor (Frag Engine Interface)"""
 
 from .modular_editor import (
     CodeBlock,
@@ -15,11 +15,10 @@ except ImportError:
     cli_main = None
 
 
-# Lazy load TUI components to handle environments missing Textual gracefully
 def get_tui_app():
     """Returns the Textual TUI App class if Textual is installed."""
     try:
-        from .tui_editor import ModularEditorTUI
+        from .ui.app import ModularEditorTUI
         return ModularEditorTUI
     except ImportError as e:
         raise ImportError(

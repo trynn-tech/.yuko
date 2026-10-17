@@ -12,6 +12,38 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
+        # Define textual-vim locally since it is not packaged in upstream Nixpkgs
+	textual-vim = pkgs.python3Packages.buildPythonPackage rec {
+          pname = "textual-vim";
+          version = "0.1.0";
+          
+          pyproject = true;
+
+          src = pkgs.fetchFromGitHub {
+            owner = "davidbrochart";
+            repo = "textual-vim";
+            rev = "v${version}";
+            
+            # Forces Nix to clone the git repository directly without using a tarball URL
+            forceFetchGit = true; 
+            
+            # Throw an intentional fake hash structure to capture the true git directory layout hash
+            hash = "sha256-oi8s4iotR9wkZmQz7lJd60n/uo2wEOrZKzLHYWOph2g=";
+          };
+
+          "build-system" = [
+            pkgs.python3Packages.hatchling
+          ];
+
+	  propagatedBuildInputs = with pkgs.python3Packages; [
+            textual
+            pyte
+          ];
+          doCheck = false;
+        };
+
+
+
         pythonEnv = pkgs.python3.withPackages (ps: with ps; [
           gitpython
           pydantic
@@ -22,6 +54,10 @@
           tree-sitter-grammars.tree-sitter-bash
           tree-sitter-grammars.tree-sitter-c
           rich
+          
+          # TUI Core & Vim Overlay
+          textual
+          textual-vim
 
           # Math & Vector Primitives
           numpy
@@ -93,3 +129,4 @@
       }
     );
 }
+

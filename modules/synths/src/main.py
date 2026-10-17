@@ -357,13 +357,11 @@ def main():
 
         overall_success = True
         for step in recipe:
-            success, frame = coordinator.execute_step(step)
+            success = coordinator.execute_step(step)
             if success:
                 console.print(
                     f"[bold green]✓ Applied changes and synchronized 3-tier memory for {step.target_file}[/bold green]"
                 )
-                if frame:
-                    render_thought_frame(frame, console_out=console)
             else:
                 console.print(
                     f"[bold red]❌ Recipe halted at Step {step.step_id}: {step.target_file}[/bold red]"

@@ -69,6 +69,12 @@
           profileModule = ./profiles/yuko-fob.nix;
         };
 
+        # Mobile Networking Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
+        yuko-mobile-fob = mkYuko {
+          inherit (yukoEnv) userName homeDir;
+          profileModule = ./profiles/yuko-mobile-fob.nix;
+        };
+
         # Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
         yuko-windows = mkYuko {
           inherit (yukoEnv) userName homeDir;

@@ -44,12 +44,14 @@ in
         cs = "cd /etc/nixos";
         ym = "yuko_snowball";
         yf = "yuko_roam";
+        ymf = "yuko_mobile_roam";
         yw = "yuko_windows";
         ys = "sudo nixos-rebuild switch";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
         ns = "nh search";
         cat-intake = "echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
+	frag = "synth-tui";
       };
 
       initContent = ''
@@ -108,7 +110,7 @@ in
           home-manager switch -b backup --flake .#yuko-core
         }
 
-        lol(){
+        yay(){
           yuko_snowball | lolcat
         }
 
@@ -128,7 +130,23 @@ in
           home-manager switch -b backup --flake .#yuko-fob
         }
 
-        alias -g mew="| lolcat"
+	yuko_mobile_roam() {
+          cd "${yukoFlake}" || return 1
+          if [ "$1" = "-u" ] || [ "$1" = "--update" ]; then
+            echo "[yuko] updating flake inputs..."
+            nix flake update
+          fi
+
+          if command -v yuko-offline-check &>/dev/null; then
+            yuko-offline-check
+          fi
+          echo "[yuko] formatting..."
+          nix fmt . 2>/dev/null
+          echo "[yuko] activating configuration..."
+          home-manager switch -b backup --flake .#yuko-mobile-fob
+        }
+
+        alias -g mew="2>&1 | tee /dev/tty | xclip -sel clip"
 
         # Router: Route interactive subcommands, fallback directly to synth CLI
         yuko() {
