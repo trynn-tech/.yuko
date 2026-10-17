@@ -1,12 +1,13 @@
-"""VimTextArea: the active code buffer (preview + editor in one).
+"""VimTextArea: the active code buffer (preview + editor in one), driven by VimEngine.
 
-* Shows the selected block with syntax highlighting; edit it in place.
-* NORMAL mode `Enter` (only while this buffer has focus) or `:w` writes it to disk.
-* `:` opens the ex command line (:w :wq :q :q! :u :earlier :e a ...).
-* `u` / `Ctrl+R` are dirty-aware: with uncommitted edits they undo/redo typing in the
-  buffer; otherwise they walk the file's UndoTree (and re-write the file).
-* `g-` / `g+` travel the UndoTree by time, across branches.
-* Multi-key sequences: dd, dG, gg, g-, g+, plus G and the usual motions.
+NORMAL mode speaks real Vim: counts, operators (d c y > <) with motions and text objects
+(dw, d$, ciw, di", da(, 3dd, yyp ...), visual v / V, x X D C Y s S p P J ~ r o O a A i I.
+See vimcore.py for the exact grammar.
+
+Editor-specific keys (NORMAL mode, buffer focused only):
+    Enter   write to disk (same as :w)        :   ex command line      /   search
+    u       undo (typing, or the file's UndoTree once the buffer is clean)    Ctrl+R  redo
+    g- g+   UndoTree back / forward in time   n N next / previous search hit
 """
 
 import subprocess
@@ -16,6 +17,12 @@ from textual import events
 from textual.binding import Binding
 from textual.reactive import reactive
 from textual.widgets import TextArea
+from textual.widgets.text_area import Selection
+
+try:
+    from .vimcore import VISUAL_MODES, VimEngine, _first_nonblank, _line_end, _line_start
+except (ImportError, ValueError):
+    from editor.ui.components.vimcore import VISUAL_MODES, VimEngine, _first_nonblank, _line_end, _line_start  # noqa: F401
 
 
 class VimTextArea(TextArea):
@@ -23,31 +30,12 @@ class VimTextArea(TextArea):
     mode: reactive[str] = reactive("NORMAL")
 
     BINDINGS = [
-        # Mode triggers & submission
         Binding("escape", "handle_escape", "Exit/Normal Mode", show=False),
-        Binding("i", "enter_insert_mode", "Insert Mode", show=False),
-        Binding("a", "append_mode", "Append Mode", show=False),
-        Binding("o", "open_line_below", "Open Line Below", show=False),
-        # Motions
-        Binding("h", "cursor_left", "Move Left", show=False),
-        Binding("j", "cursor_down", "Move Down", show=False),
-        Binding("k", "cursor_up", "Move Up", show=False),
-        Binding("l", "cursor_right", "Move Right", show=False),
-        Binding("w", "cursor_word_right", "Next Word", show=False),
-        Binding("b", "cursor_word_left", "Prev Word", show=False),
-        Binding("0", "cursor_home", "Start of Line", show=False),
-        Binding("$", "cursor_end", "End of Line", show=False),
-        Binding("G", "move_bottom", "Go to Bottom", show=False),
-        # Operations
-        Binding("x", "delete_char", "Delete Char", show=False),
-        Binding("p", "paste_clipboard", "Paste Clipboard", show=False),
-        Binding("u", "vim_undo", "Undo", show=False),
-        Binding("ctrl+r", "vim_redo", "Redo", show=False),
     ]
 
     def __init__(self, text: str = "", vim_mode: bool = True, *args, **kwargs):
         # Instance attributes FIRST: reactive watchers can fire during super().__init__
-        self._pending_key: Optional[str] = None
+        self._engine = VimEngine()
         self._baseline: str = text
 
         kwargs.setdefault("show_line_numbers", True)
@@ -56,14 +44,12 @@ class VimTextArea(TextArea):
 
         self.vim_mode_enabled = vim_mode
         if self.vim_mode_enabled:
-            self.mode = "NORMAL"
-            self.read_only = True
+            self._vim_set_mode("NORMAL")
 
     # --- Active-buffer API ----------------------------------------------
 
     @property
     def is_dirty(self) -> bool:
-        """True if the buffer differs from what was last loaded/committed."""
         return self.text != self._baseline
 
     def set_language(self, language: Optional[str]) -> None:
@@ -76,14 +62,8 @@ class VimTextArea(TextArea):
             except Exception:
                 pass
 
-    def load_block(
-        self,
-        content: str,
-        language: Optional[str] = None,
-        name: str = "",
-        start_line: int = 1,
-        end_line: Optional[int] = None,
-    ) -> None:
+    def load_block(self, content: str, language: Optional[str] = None, name: str = "",
+                   start_line: int = 1, end_line: Optional[int] = None) -> None:
         """Loads a block as the new clean baseline of the buffer."""
         self._baseline = content
         if language is not None:
@@ -92,215 +72,219 @@ class VimTextArea(TextArea):
         self.move_cursor((0, 0))
         span = f"L{start_line}-{end_line}" if end_line else f"L{start_line}"
         self.border_subtitle = f"{name}  {span}" if name else span
-        self._pending_key = None
+        if self.vim_mode_enabled:
+            self._vim_set_mode("NORMAL")
 
-    # --- Reactive watchers ------------------------------------------------
+    def enter_insert(self) -> None:
+        """Start typing immediately (used by the smart-edit window)."""
+        self._vim_set_mode("INSERT")
+
+    # --- mode plumbing ------------------------------------------------------
+
+    def _vim_set_mode(self, mode: str) -> None:
+        self._engine.mode = mode
+        if mode == "NORMAL":
+            self._engine._reset()
+        self.read_only = mode != "INSERT"
+        if self.mode != mode:
+            self.mode = mode
+        else:
+            self.watch_mode(mode)
 
     def watch_mode(self, new_mode: str) -> None:
         if not self.vim_mode_enabled:
             self.border_title = "EDIT"
             return
-        color = "#00d7ff" if new_mode == "NORMAL" else "#00ffaf"
-        pending = f" [{self._pending_key}]" if self._pending_key else ""
-        self.border_title = f"[{color} bold]-- {new_mode}{pending} --[/{color} bold]"
+        color = {"NORMAL": "#00d7ff", "INSERT": "#00ffaf"}.get(new_mode, "#ffb86c")
+        pending = self._engine.pending
+        tail = f" {pending}" if pending else ""
+        self.border_title = f"[{color} bold]-- {new_mode}{tail} --[/{color} bold]"
 
     def watch_vim_mode_enabled(self, enabled: bool) -> None:
         if not enabled:
             self.read_only = False
             self.border_title = "EDIT"
         else:
-            self.mode = "NORMAL"
-            self.read_only = True
+            self._vim_set_mode("NORMAL")
 
     def on_focus(self) -> None:
+        if self.vim_mode_enabled and self.mode == "INSERT":
+            return  # keep typing if we were already inserting
         if self.vim_mode_enabled:
-            self.mode = "NORMAL"
-            self.read_only = True
-            self._pending_key = None
+            self._vim_set_mode("NORMAL")
 
-    # --- Mode & navigation actions ----------------------------------------
+    # --- helpers ---------------------------------------------------------------
 
-    def action_handle_escape(self) -> None:
-        self._pending_key = None
-        if not self.vim_mode_enabled:
-            self.action_blur_self()
-            return
-        if self.mode == "INSERT":
-            self.mode = "NORMAL"
-            self.read_only = True
-        else:
-            self.action_blur_self()
+    def _host_call(self, name: str) -> None:
+        """Route editor-level actions to the enclosing screen if it defines them, else the app."""
+        host = self.screen if hasattr(self.screen, name) else self.app
+        fn = getattr(host, name, None)
+        if fn:
+            fn()
 
-    def action_enter_insert_mode(self) -> None:
-        if not self.vim_mode_enabled:
-            return
-        self.mode = "INSERT"
-        self.read_only = False
-        self._pending_key = None
+    @staticmethod
+    def _vim_idx(text: str, loc) -> int:
+        row, col = loc
+        lines = text.split("\n")
+        row = max(0, min(row, len(lines) - 1))
+        return sum(len(l) + 1 for l in lines[:row]) + min(col, len(lines[row]))
 
-    def action_append_mode(self) -> None:
-        if not self.vim_mode_enabled or self.mode != "NORMAL":
-            return
-        self.action_cursor_right()
-        self.mode = "INSERT"
-        self.read_only = False
-        self._pending_key = None
-
-    def action_open_line_below(self) -> None:
-        if not self.vim_mode_enabled or self.mode != "NORMAL":
-            return
-        self.action_cursor_end()
-        self.read_only = False
-        self.insert("\n")
-        self.mode = "INSERT"
-        self._pending_key = None
-
-    def action_move_bottom(self) -> None:
-        if self.vim_mode_enabled and self.mode == "NORMAL":
-            self.move_cursor((self.document.line_count - 1, 0))
-
-    def action_commit_buffer(self) -> None:
-        """Enter (NORMAL): queue the buffer and write it to disk."""
-        if hasattr(self.app, "action_commit_and_write_disk"):
-            self.app.action_commit_and_write_disk()
-
-    # --- Undo / redo (dirty-aware) ----------------------------------------
+    @staticmethod
+    def _vim_loc(text: str, idx: int):
+        idx = max(0, min(idx, len(text)))
+        return text.count("\n", 0, idx), idx - (text.rfind("\n", 0, idx) + 1)
 
     def _with_edit_rights(self, fn) -> None:
-        was_read_only = self.read_only
+        was = self.read_only
         self.read_only = False
         try:
             fn()
         finally:
-            self.read_only = was_read_only
+            self.read_only = was
 
-    def action_vim_undo(self) -> None:
-        if self.is_dirty:
-            self._with_edit_rights(lambda: TextArea.action_undo(self))  # undo typing in the buffer
-        elif hasattr(self.app, "action_history_undo"):
-            self.app.action_history_undo()  # buffer is clean: walk the file's UndoTree
+    # --- registers / clipboard ---------------------------------------------------
 
-    def action_vim_redo(self) -> None:
-        if self.is_dirty:
-            self._with_edit_rights(lambda: TextArea.action_redo(self))
-        elif hasattr(self.app, "action_history_redo"):
-            self.app.action_history_redo()
+    def _vim_on_yank(self, text: str, linewise: bool, to_system: bool) -> None:
+        self.app.internal_yank_buffer = text  # keeps `p` and the tree's yanks in one register
+        if to_system:
+            try:
+                self.app.navigation_strategy._copy_text(text)
+            except Exception:
+                pass
 
-    # --- Deletion (uses TextArea edit API so `u` can undo it) --------------
+    def _vim_sync_register(self) -> None:
+        buf = getattr(self.app, "internal_yank_buffer", "")
+        if not buf and not self._engine.register[0]:
+            for cmd in (["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-o"],
+                        ["xsel", "--clipboard", "--output"]):
+                try:
+                    buf = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=1).decode("utf-8")
+                    if buf:
+                        break
+                except Exception:
+                    continue
+        if buf and buf != self._engine.register[0]:
+            self._engine.register = (buf, buf.endswith("\n"))  # e.g. a yanked file or block pastes as lines
 
-    def action_delete_line(self) -> None:
-        """dd"""
-        doc = self.document
-        if doc.line_count == 0:
-            return
-        row, _ = self.cursor_location
-        row = min(row, doc.line_count - 1)
-        if row < doc.line_count - 1:
-            start, end = (row, 0), (row + 1, 0)
-        elif row > 0:
-            start, end = (row - 1, len(doc.get_line(row - 1))), (row, len(doc.get_line(row)))
+    # --- feeding the engine -------------------------------------------------------
+
+    def _vim_feed(self, key: str) -> bool:
+        text = self.text
+        cur = self._vim_idx(text, self.cursor_location)
+        if key in ("p", "P"):
+            self._vim_sync_register()
+        r = self._engine.feed(key, text, cur)
+
+        if r.edits:
+            def do_edits() -> None:
+                for e in sorted(r.edits, key=lambda e: e.start, reverse=True):
+                    self.replace(e.text, self._vim_loc(text, e.start), self._vim_loc(text, e.end))
+            self._with_edit_rights(do_edits)
+        new = self.text
+
+        if r.yank:
+            self._vim_on_yank(*r.yank)
+        if r.mode is not None:
+            self._vim_set_mode(r.mode)  # also sets read_only for INSERT
+        if r.cursor is not None:
+            self.move_cursor(self._vim_loc(new, r.cursor))
+        if r.selection is not None:
+            self._vim_show_visual(new, *r.selection)
+        if r.external:
+            self._vim_external(r.external)
+        self.watch_mode(self.mode)  # refresh the pending-keys indicator
+        return r.handled
+
+    def _vim_show_visual(self, text: str, anchor: int, cur: int) -> None:
+        lo, hi = sorted((anchor, cur))
+        if self._engine.mode == "V-LINE":
+            lo, hi = _line_start(text, lo), _line_end(text, hi)
         else:
-            start, end = (0, 0), (0, len(doc.get_line(0)))
-        self._with_edit_rights(lambda: self.delete(start, end))
-        self.move_cursor((min(row, self.document.line_count - 1), 0))
+            hi = min(hi + 1, len(text))
+        self.selection = Selection(start=self._vim_loc(text, lo), end=self._vim_loc(text, hi))
 
-    def action_delete_to_end(self) -> None:
-        """dG"""
-        row, _ = self.cursor_location
-        if row == 0:
-            start = (0, 0)
+    def _vim_external(self, name: str) -> None:
+        if name == "undo":
+            self.action_vim_undo()
         else:
-            start = (row - 1, len(self.document.get_line(row - 1)))  # also eat the preceding newline
-        self._with_edit_rights(lambda: self.delete(start, self.document.end))
-        self.move_cursor((max(0, self.document.line_count - 1), 0))
+            self._host_call({"earlier": "action_history_earlier", "later": "action_history_later",
+                             "search_next": "action_search_next", "search_prev": "action_search_prev"}[name])
 
-    def action_delete_char(self) -> None:
-        if self.vim_mode_enabled and self.mode == "NORMAL":
-            self._with_edit_rights(self.action_delete_right)
-
-    # --- Multi-key event interceptor ---------------------------------------
+    # --- key handling --------------------------------------------------------------
 
     def on_key(self, event: events.Key) -> None:
-        if not self.vim_mode_enabled or self.mode != "NORMAL":
+        if not self.vim_mode_enabled:
             return
 
         def consume() -> None:
             event.stop()
             event.prevent_default()
 
-        if event.key == "escape":
-            self.action_blur_self()
-            return consume()
+        if self.mode == "INSERT":
+            if event.key == "escape":
+                self._vim_leave_insert()
+                consume()
+            return  # everything else is normal typing
 
-        # ":" opens the ex command line (NORMAL mode only; INSERT mode types a colon)
-        if event.key == "colon" or event.character == ":":
-            self._pending_key = None
-            self.app.action_open_cmdline()
-            return consume()
-
-        # Enter == :w, but ONLY here: NORMAL mode with this buffer focused
-        if event.key == "enter":
-            self._pending_key = None
-            self.action_commit_buffer()
-            return consume()
-
-        char = event.character
-
-        if self._pending_key == "d":
-            self._pending_key = None
-            if char == "d":
-                self.action_delete_line()
-                return consume()
-            if char == "G":
-                self.action_delete_to_end()
-                return consume()
-
-        elif self._pending_key == "g":
-            self._pending_key = None
-            if char == "g":
-                self.move_cursor((0, 0))
-                return consume()
-            if char in ("-", "+") and hasattr(self.app, "action_history_earlier"):
-                (self.app.action_history_earlier if char == "-" else self.app.action_history_later)()
-                return consume()
-
-        if char in ("d", "g"):
-            self._pending_key = char
-            self.watch_mode(self.mode)
-            return consume()
-
-        # Suppress plain text input in NORMAL mode for unhandled printable keys
-        if char and char not in ("h", "j", "k", "l", "w", "b", "0", "$", "x", "p", "i", "a", "o", "u", "G"):
+        key = event.key
+        if key == "ctrl+r":
             consume()
+            self.action_vim_redo()
+            return
+        if key == "escape":
+            if not self._vim_feed("<Esc>"):
+                self.action_blur_self()  # nothing pending: surrender focus to the tree
+            consume()
+            return
+        if key == "enter":
+            if self.mode == "NORMAL" and not self._engine.pending:
+                self._host_call("action_commit_and_write_disk")  # Enter == :w, only here
+            consume()
+            return
 
-    # --- Clipboard -----------------------------------------------------------
+        ch = event.character if event.is_printable else None
+        if ch is None:
+            return  # arrows, tab, etc. keep their default behaviour
+        if not self._engine.pending:
+            if ch == ":":
+                consume()
+                self._host_call("action_open_cmdline")
+                return
+            if ch == "/":
+                consume()
+                self._host_call("action_open_search")
+                return
+        self._vim_feed(ch)
+        consume()
 
-    def action_paste_clipboard(self) -> None:
-        pasted_text = ""
-        if getattr(self.app, "internal_yank_buffer", ""):
-            pasted_text = self.app.internal_yank_buffer
+    def _vim_leave_insert(self) -> None:
+        self._vim_set_mode("NORMAL")
+        row, col = self.cursor_location
+        if col > 0:
+            self.move_cursor((row, col - 1))  # Vim steps back one char when leaving INSERT
+
+    # --- actions ----------------------------------------------------------------------
+
+    def action_handle_escape(self) -> None:
+        if self.mode == "INSERT":
+            self._vim_leave_insert()
+        elif not self._vim_feed("<Esc>"):
+            self.action_blur_self()
+
+    def action_vim_undo(self) -> None:
+        if self.is_dirty:
+            self._with_edit_rights(lambda: TextArea.action_undo(self))  # undo typing in the buffer
         else:
-            for cmd in (
-                ["wl-paste", "--no-newline"],
-                ["xclip", "-selection", "clipboard", "-o"],
-                ["copyq", "clipboard"],
-                ["xsel", "--clipboard", "--output"],
-            ):
-                try:
-                    out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL)
-                    pasted_text = out.decode("utf-8")
-                    if pasted_text:
-                        break
-                except (FileNotFoundError, subprocess.CalledProcessError):
-                    continue
+            self._host_call("action_history_undo")  # buffer is clean: walk the file's UndoTree
 
-        if pasted_text:
-            self._with_edit_rights(lambda: self.insert(pasted_text))
-            if hasattr(self.app, "log_status"):
-                self.app.log_status("[bold #00ffaf]Pasted content into buffer![/bold #00ffaf]")
-        elif not self.vim_mode_enabled or self.mode == "INSERT":
-            self.insert("p")
+    def action_vim_redo(self) -> None:
+        if self.is_dirty:
+            self._with_edit_rights(lambda: TextArea.action_redo(self))
+        else:
+            self._host_call("action_history_redo")
 
     def action_blur_self(self) -> None:
-        if hasattr(self.app, "action_blur_inputs"):
+        if hasattr(self.screen, "action_blur_inputs"):
+            self.screen.action_blur_inputs()
+        elif hasattr(self.app, "action_blur_inputs"):
             self.app.action_blur_inputs()

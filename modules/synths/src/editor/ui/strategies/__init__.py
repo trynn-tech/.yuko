@@ -5,6 +5,8 @@ from .mutation import DefaultMutationStrategy
 from .stage import StageStrategy
 from .history import HistoryStrategy
 from .command import CommandStrategy
+from .search import SearchStrategy
+from .workspace import WorkspaceStrategy
 
 __all__ = [
     "DefaultNavigationStrategy",
@@ -12,4 +14,6 @@ __all__ = [
     "StageStrategy",
     "HistoryStrategy",
     "CommandStrategy",
+    "SearchStrategy",
+    "WorkspaceStrategy",
 ]

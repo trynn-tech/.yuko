@@ -28,6 +28,7 @@
     gnuplot # cli graphing utility
     yt-dlp
     scrcpy # Remote android control
+    freecad
   ];
 
 }

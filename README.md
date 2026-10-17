@@ -101,5 +101,6 @@ Gradually aligning task orchestration to feed `synth` deeper intelligence capabi
 
 * *Operational Note:* Neuromancing for the fun ... currently considor this to be a type of Front-End Operating System development
 
-# _Architecture developed in with OpenAI models such as ChatGPT_
+# **_Architecture developed in with OpenAI models such as ChatGPT_**
 # **_Engineering and Design developed with Google models such as Gemini_**
+# **_Frag Editor Design and Quality Assurance with Claude models_**

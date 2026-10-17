@@ -47,13 +47,23 @@ SKIP_NAMES = frozenset(
 )
 
 
+WORKSPACE_EXPAND_DEPTH = 1  # workspace mode: folders this many levels below the root start unfolded
+
+
 class DefaultNavigationStrategy(NavigationStrategy):
-    """Single-file AST views plus workspace exploration with alphabetical file codes."""
+    """Single-file AST views plus workspace exploration.
+
+    Workspace mode numbers files 1, 2, 3 ... and jumping there SELECTS the file (it stays selected,
+    so `y` yanks it, Enter opens it). The Directory Explorer inside the AST view keeps letter codes
+    (a, b ... aa) because plain numbers mean block indices there.
+    """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.directory_mode: bool = False
         self.fs_root_path: Optional[Path] = None
+        self.workspace_selected: Optional[Path] = None     # persists across tree rebuilds
+        self._fs_nodes: Dict[Path, TreeNode] = {}
 
     # ------------------------------------------------------------------
     # Spreadsheet-style base-26 helpers
@@ -285,47 +295,89 @@ class DefaultNavigationStrategy(NavigationStrategy):
     def _open_file_by_index(self, n: int) -> bool:
         files = self._workspace_files()
         if 1 <= n <= len(files):
+            if self.directory_mode:
+                return self._select_workspace_file(files[n - 1], n)  # select + keep browsing
             return self.select_block({"type": "file", "path": files[n - 1]})
+        label = str(n) if self.directory_mode else self._index_to_alpha(n)
         self.app.log_status(
-            f"[bold #ff5f5f]File code [{self._index_to_alpha(n)}] out of range "
-            f"(1-{len(files)} files).[/bold #ff5f5f]"
+            f"[bold #ff5f5f]File [{label}] out of range (1-{len(files)} files).[/bold #ff5f5f]"
         )
         return False
+
+    def _reveal(self, path: Path) -> bool:
+        node = self._fs_nodes.get(path)
+        if node is None:
+            return False
+        tree = self.app.query_one("#ast-tree", NavigableTree)
+        ancestor = node.parent
+        while ancestor:
+            ancestor.expand()
+            ancestor = ancestor.parent
+
+        def place() -> None:
+            tree.move_cursor(node)
+            tree.scroll_to_node(node)
+
+        tree.call_after_refresh(place)  # line numbers are only valid after the re-layout
+        return True
+
+    def _select_workspace_file(self, path: Path, n: Optional[int] = None) -> bool:
+        """Workspace-mode jump: highlight the file and remember it (so `y` can yank it)."""
+        self.workspace_selected = path
+        self._reveal(path)
+        self.app.query_one("#ast-tree", NavigableTree).focus()
+        tag = f"\\[{n}] " if n is not None else ""
+        self.app.log_status(
+            f"[bold #00ffaf]Selected[/bold #00ffaf] {tag}{escape(path.name)}   "
+            f"[dim]y = yank contents · Enter = open · D = delete[/dim]"
+        )
+        return True
+
+    def _restore_workspace_cursor(self) -> None:
+        if self.directory_mode and self.workspace_selected is not None:
+            self._reveal(self.workspace_selected)
 
     # ------------------------------------------------------------------
     # Tree population
     # ------------------------------------------------------------------
-    def _populate_directory_node(self, parent_node: TreeNode, dir_path: Path, index_counter: List[int]) -> None:
+    def _populate_directory_node(self, parent_node: TreeNode, dir_path: Path, index_counter: List[int],
+                                 numeric: bool = False, depth: int = 0) -> None:
         for entry in self._list_entries(dir_path):
             entry_path = Path(entry.path)
             if entry.is_dir(follow_symlinks=False):
-                dir_node = parent_node.add(f"📁 {escape(entry.name)}", expand=False)
+                dir_node = parent_node.add(
+                    f"📁 {escape(entry.name)}", expand=numeric and depth < WORKSPACE_EXPAND_DEPTH
+                )
                 dir_node.data = {"type": "directory", "path": entry_path}
-                self._populate_directory_node(dir_node, entry_path, index_counter)
+                self._fs_nodes[entry_path] = dir_node
+                self._populate_directory_node(dir_node, entry_path, index_counter, numeric, depth + 1)
             else:
                 index_counter[0] += 1
                 n = index_counter[0]
-                alpha = self._index_to_alpha(n)
+                alpha = str(n) if numeric else self._index_to_alpha(n)
                 fp = getattr(self.app, "filepath", None)
                 is_active = bool(fp) and entry_path.resolve() == Path(fp).resolve()
                 icon = "🎯" if is_active else "📄"
                 # "\[" escapes Rich markup, otherwise "[a]" is parsed as a style tag and vanishes
-                parent_node.add_leaf(
+                leaf = parent_node.add_leaf(
                     f"\\[{alpha}] {icon} {escape(entry.name)}",
                     data={"type": "file", "path": entry_path, "index": n, "alpha": alpha},
                 )
+                self._fs_nodes[entry_path] = leaf
 
     def populate_tree(self) -> None:
         tree = self.app.query_one("#ast-tree", NavigableTree)
         tree.clear()
+        self._fs_nodes.clear()
         base_dir = self._get_base_dir()
 
-        # Mode A: Workspace Directory View
+        # Mode A: Workspace Directory View (numbered 1, 2, 3 ...; first level of folders unfolded)
         if self.directory_mode:
             tree.root.label = f"📂 Workspace ({escape(base_dir.name)}/)"
             tree.root.data = {"type": "directory", "path": base_dir}
             tree.root.expand()
-            self._populate_directory_node(tree.root, base_dir, [0])
+            self._populate_directory_node(tree.root, base_dir, [0], numeric=True, depth=0)
+            self._restore_workspace_cursor()
             return
 
         # Mode B: Single-File AST Explorer
@@ -502,7 +554,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
                     end_line=block.end_line,
                 )
             self.app.selected_block_id = block.index
-            self.app.query_one("#target-preview").update_target(block, language=language)
             self.app.log_status(
                 f"[#00ffaf]Selected Block [{block.index}]:[/#00ffaf] {escape(block.name)} ({block.block_type})"
             )

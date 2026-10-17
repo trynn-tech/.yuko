@@ -67,16 +67,21 @@ class NavigableTree(Tree):
                 self.select_node(children[idx - 1])
 
     def action_next_category(self) -> None:
+        """Mirror of `h`: expand -> first child -> next sibling (top level included)."""
         node = self.cursor_node
         if not node:
             return
+        # h: expanded with children -> collapse   |   l: collapsed with children -> expand
         if node.children and not node.is_expanded:
             node.expand()
-            if node.children:
-                self.select_node(node.children[0])
             return
-        elif node.parent and node.parent != self.root:
-            siblings = node.parent.children
+        # h: go to parent   |   l: go to first child
+        if node.children and node.is_expanded:
+            self.select_node(node.children[0])
+            return
+        # h: top-level node -> previous sibling   |   l: leaf -> next sibling
+        siblings = node.parent.children if node.parent else []
+        if node in siblings:
             idx = siblings.index(node)
             if idx < len(siblings) - 1:
                 self.select_node(siblings[idx + 1])

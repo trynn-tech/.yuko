@@ -15,5 +15,6 @@
     nix-alien
     gcc
     gnumake
+    gh
   ];
 }

@@ -35,7 +35,10 @@ HELP = [
     ":earlier [N]  :later [N]   step N states through time (g- / g+)",
     ":undotree [open|close|toggle]   history panel",
     ":queue  :apply  :clear  :pop    batch queue (queue only / apply all / clear / pop last)",
-    ":op <replace|insert_before|insert_after|smart_replace>",
+    ":op <replace|insert_before|insert_after|smart_replace>   operation used by :w / :queue",
+    ":find <text>  /text   select the function containing text (n / N = next / prev; /re/ = regex)",
+    ":smart                paste several functions: matched to the file by name, applied as one change",
+    ":new <path>  :rm [n]  workspace: create a file / delete one (asks to confirm)",
     ":<number>             go to line in the buffer",
 ]
 
@@ -63,6 +66,10 @@ class CommandStrategy(BaseEditorStrategy):
             (("clear",), self._clear),
             (("pop",), self._pop),
             (("op",), self._op),
+            (("find", "search", "grep"), self._find),
+            (("new", "touch"), self._new),
+            (("rm", "delete", "del"), self._rm),
+            (("smart", "sm"), self._smart),
             (("help", "h"), self._help),
         ):
             for n in names:
@@ -221,8 +228,22 @@ class CommandStrategy(BaseEditorStrategy):
     def _op(self, bang: bool, arg: str) -> bool:
         if arg not in OPS:
             return self._err(f"E474: :op needs one of {', '.join(OPS)}")
-        self.app.query_one("#op-select").value = arg
+        self.app.mutation_op = arg
+        self.app.refresh_buffer_label()
         self.app.log_status(f"[#00d7ff]Operation set to {arg}.[/#00d7ff]")
+        return True
+
+    def _find(self, bang: bool, arg: str) -> bool:
+        return self.app.search_strategy.find(arg)
+
+    def _new(self, bang: bool, arg: str) -> bool:
+        return self.app.workspace_strategy.new_file(arg)
+
+    def _rm(self, bang: bool, arg: str) -> bool:
+        return self.app.workspace_strategy.delete(arg)
+
+    def _smart(self, bang: bool, arg: str) -> bool:
+        self.app.action_smart_edit()
         return True
 
     def _goto_line(self, n: int) -> bool:

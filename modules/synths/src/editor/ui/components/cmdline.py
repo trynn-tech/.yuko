@@ -25,8 +25,12 @@ class CommandInput(Input):
         self.value = ""
         self._hist_idx = -1
 
+    def _host(self):
+        """The enclosing modal screen if it owns a command bar, else the app."""
+        return self.screen if hasattr(self.screen, "close_cmdline") else self.app
+
     def action_cancel(self) -> None:
-        self.app.close_cmdline()
+        self._host().close_cmdline()
 
     def action_backspace_or_cancel(self) -> None:
         if self.value:
@@ -35,7 +39,7 @@ class CommandInput(Input):
             self.action_cancel()  # vim: backspace on an empty ':' line leaves it
 
     def _history(self):
-        return self.app.command_strategy.history
+        return self._host().command_strategy.history
 
     def _set(self, text: str) -> None:
         self.value = text
@@ -57,6 +61,6 @@ class CommandInput(Input):
             self._set("")
 
     def action_complete(self) -> None:
-        completed = self.app.command_strategy.complete(self.value)
+        completed = self._host().command_strategy.complete(self.value)
         if completed is not None:
             self._set(completed)

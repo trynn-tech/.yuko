@@ -1,8 +1,8 @@
 # editor/ui/strategies/mutation.py
 from pathlib import Path
+from typing import Optional
 
 from rich.markup import escape
-from textual.widgets import Select
 
 try:
     from ..components.inputs import VimTextArea
@@ -22,7 +22,7 @@ class DefaultMutationStrategy:
             self.app.log_status("[bold #ff5555]Error:[/bold #ff5555] No AST block selected!")
             return False
 
-        op_type = op_type or self.app.query_one("#op-select", Select).value
+        op_type = op_type or self.app.mutation_op
         content = content if content is not None else self.app.query_one("#content-input", VimTextArea).text
         if not content:
             self.app.log_status("[bold #ffb86c]Warning:[/bold #ffb86c] Buffer is empty.")
@@ -51,7 +51,7 @@ class DefaultMutationStrategy:
             return ", ".join(parts[:3]) + f" (+{len(parts) - 3} more)"
         return ", ".join(parts) or "mutation"
 
-    def apply(self) -> bool:
+    def apply(self, label: Optional[str] = None) -> bool:
         """Applies queued ops, writes the file, and records a history state."""
         editor = self.app.editor
         if not editor.mutation_buffer:
@@ -60,7 +60,7 @@ class DefaultMutationStrategy:
 
         nav, history = self.app.navigation_strategy, self.app.history_strategy
         history.attach()  # make sure the pre-change state is already in the tree
-        label = self._describe_buffer()
+        label = label or self._describe_buffer()
         snap = nav.snapshot_selection()
 
         updated = editor.apply_batch()
@@ -77,14 +77,14 @@ class DefaultMutationStrategy:
         return True
 
     def commit(self) -> bool:
-        """Enter in NORMAL mode / :w: queue the active buffer and immediately write it to disk."""
+        """Enter in NORMAL mode: queue the active buffer and immediately write it to disk."""
         block_id = self.app.selected_block_id
         if block_id is None:
             self.app.log_status("[bold #ff5555]Error:[/bold #ff5555] No active AST block selected.")
             return False
 
         area = self.app.query_one("#content-input", VimTextArea)
-        op_type = self.app.query_one("#op-select", Select).value
+        op_type = self.app.mutation_op
         block = next((b for b in self.app.editor.blocks if b.index == block_id), None)
         if op_type == "replace" and block is not None and area.text == block.content:
             self.app.log_status("[#ffb86c]No changes in buffer.[/#ffb86c]")
