@@ -1,5 +1,13 @@
 # Technical Status Update
 
+## Frag Editor (frag)
+Frag is an advanced, modular AST block editor and terminal interface (ModularEditorTUI) built for structured code navigation, rapid structural refactoring, and seamless workspace management.
+🚀 Key Features
+ * Dual-Mode Exploration: Toggle effortlessly between Single-File AST Semantic Mode (breaking down code into imports, classes, functions, statements, and edit windows) and Workspace Directory Explorer Mode.
+ * Spreadsheet-Style Alphabetical Indexing: Workspace files are automatically indexed using clean base-26 spreadsheet codes ([a], [b] ... [z], [aa], [ab]), allowing lightning-fast cross-file navigation and selection.
+ * Vim-Style Modal Workflow: First-class modal keybindings supporting navigation (j, k, h, l), line/block operations, direct text editing, and quick focus toggles.
+ * Integrated UndoTree (Ctrl + U): Inspect, track, and navigate mutation checkpoints and revision history with a visual byte-level block history buffer.
+ * Direct Disk Commit (Enter): Instantly queue and commit code modifications straight to disk while maintaining structural state.
 
 ## Yuko Workspace & Environment Setup For Windows 
 <!--
