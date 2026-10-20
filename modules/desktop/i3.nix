@@ -156,7 +156,7 @@ in {
           "Mod4+equal" = "exec --no-startup-id pactl set-sink-volume @DEFAULT_SINK@ +5%";
 
 	  # Text Expanding Shortcuts via Clipboard Buffer
-	   "Mod4+b" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`\"'";
+	   "Mod4+b" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`\"'"; #vicinae offers snippets btw
 
 	  "Mod4+z" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`bash\"'";
 	  "Mod4+Shift+n" = "exec --no-startup-id bash -c 'sleep 0.15 && ${pkgs.xdotool}/bin/xdotool type --clearmodifiers -- \"\\`\\`\\`nix\"'";
@@ -164,6 +164,12 @@ in {
           
           # Emit =^-.-^= instantly at cursor
           "Mod4+i" = "exec --no-startup-id bash -c 'sleep 0.15 && xdotool type --clearmodifiers -- \"=^-.-^=\"'";
+
+	  # On screen keyboard toggle
+          #"Mod4+y" = "exec --no-startup-id ${pkgs.onboard}/bin/onboard toggle";
+	  # On screen keyboard toggle (Toggle behavior using pgrep)
+          "Mod4+y" = "exec --no-startup-id ${pkgs.procps}/bin/pkill onboard || ${pkgs.onboard}/bin/onboard";
+
 
         };
         workspaceOutputAssign = [

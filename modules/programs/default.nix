@@ -28,7 +28,10 @@
     gnuplot # cli graphing utility
     yt-dlp
     scrcpy # Remote android control
+    antimicrox # Add io functionality to controllers besides m/k
     freecad
+    aria2 # Torrent client for terminal
+    onboard # on screen keyboard
   ];
 
 }
