@@ -64,6 +64,42 @@ in
       taskCarousel
     ];
 
+        # Taskwarrior 3 On-Modify Hook for Auto-Starting Dependents
+    home.file.".local/share/task/hooks/on-modify.start-dependents" = {
+      executable = true;
+      text = ''
+        #!/usr/bin/env python3
+        import sys
+        import json
+        import subprocess
+
+        old_task_json = sys.stdin.readline()
+        new_task_json = sys.stdin.readline()
+        print(new_task_json, end="")
+
+        if not old_task_json or not new_task_json:
+            sys.exit(0)
+
+        try:
+            old_task = json.loads(old_task_json)
+            new_task = json.loads(new_task_json)
+
+            if old_task.get("status") != "completed" and new_task.get("status") == "completed":
+                parent_uuid = new_task.get("uuid")
+                if parent_uuid:
+                    cmd = ["task", f"depends.contains:{parent_uuid}", "status:pending", "export"]
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                    if result.stdout.strip():
+                        dependent_tasks = json.loads(result.stdout)
+                        for task in dependent_tasks:
+                            task_uuid = task.get("uuid")
+                            if task_uuid:
+                                subprocess.run(["task", task_uuid, "start"], capture_output=True)
+        except Exception:
+            pass
+      '';
+    };
+
     home.file.".config/task/dark-violets-256.theme".text = ''
       # Taskwarrior Dark Violets 256 Theme
       color.label=bold cyan
@@ -226,7 +262,7 @@ in
         local pending=$(${taskBin} status:pending count)
         echo -e "Completed Today: \033[1;32m$done\033[0m | Pending: \033[1;33m$pending\033[0m"
         echo -e "\n\033[1;34mCurrently Clocked In:\033[0m"
-        ${taskBin} +ACTIVE list || echo "  (No tasks currently started)"
+        ${taskBin} rc.report.next.sort=urgency+ +ACTIVE next || echo "  (No tasks currently started)"
       }
 
       _proj() {
