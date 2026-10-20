@@ -46,9 +46,11 @@ in
         yf = "yuko_roam";
         yw = "yuko_windows";
         ys = "sudo nixos-rebuild switch";
+        yso = "sudo nixos-rebuild switch --offline --option substitute false";
         vwi = "nvim ~/wiki_yuko/index.md";
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
         ns = "nh search";
+        lg = "lazygit";
         cat-intake = "echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
 	frag = "synth-tui";
       };
