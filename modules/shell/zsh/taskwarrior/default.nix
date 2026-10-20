@@ -17,7 +17,8 @@ let
     PROJECTS_CONFIG = {
         "technical": 5,
         "system": 4,
-        "yuko": 4,
+	"code": 4,
+        "yuko": 3,
         "life": 3,
         "radiant": 2,
         "re-l": 2,
@@ -177,12 +178,12 @@ in
           fi
           echo -e "\n\033[1;35m--- Next Inbox Item ---\033[0m"
           ${taskBin} "$id" info
-          echo -e "\n\033[1;36mMAP:\033[0m [s] system | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
+          echo -e "\n\033[1;36mMAP:\033[0m [s] system | [f] code | [t] technical | [y] yuko | [w] re-l | [e] emporium | [l] life | [r] radiant"
           echo -n "🚀 Move to (Key/Name/q): "
           read input
           [[ "$input" == "q" ]] && break
           case "$input" in
-            s) proj="system" ;; t) proj="technical" ;; w) proj="re-l" ;;
+            s) proj="system" ;; f) proj="code" ;; t) proj="technical" ;; w) proj="re-l" ;;
             e) proj="emporium" ;; l) proj="life" ;; r) proj="radiant" ;;
             y) proj="yuko" ;; *) proj="$input" ;;
           esac
@@ -285,7 +286,7 @@ in
         report
       }
 
-      for entry in "s:system" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
+      for entry in "s:system" "f:code" "t:technical" "y:yuko" "w:re-l" "e:emporium" "r:radiant" "l:life"; do
         key="''${entry%%:*}"; name="''${entry#*:}"
         alias "''${key}c"="_proj $name c"
         alias "''${key}r"="_proj $name r"
