@@ -1,0 +1,51 @@
+name: Sync Subrepos to GitHub
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'modules/editors/frag/**'
+      - 'modules/synths/**'
+  workflow_dispatch:
+
+jobs:
+  sync-frag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SUBREPO_SYNC_PAT }}
+
+      - name: Push Frag to GitHub
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.SUBREPO_SYNC_PAT }}
+        with:
+          source-directory: 'modules/editors/frag'
+          destination-github-username: 'trynn-tech'
+          destination-repository-name: 'frag'
+          user-email: 'sync-bot@yuko.internal'
+          user-name: 'Yuko Sync Bot'
+          target-branch: 'master'
+
+  sync-synth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SUBREPO_SYNC_PAT }}
+
+      - name: Push Synth to GitHub
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.SUBREPO_SYNC_PAT }}
+        with:
+          source-directory: 'modules/synths'
+          destination-github-username: 'trynn-tech'
+          destination-repository-name: 'synth'
+          user-email: 'sync-bot@yuko.internal'
+          user-name: 'Yuko Sync Bot'
+          target-branch: 'master'
