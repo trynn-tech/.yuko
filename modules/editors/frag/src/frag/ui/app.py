@@ -33,25 +33,25 @@ try:
     from .strategies.stage import StageStrategy
     from .strategies.workspace import WorkspaceStrategy
 except (ImportError, ValueError):
-    # Direct script / Nix-store wrapper: put the directory *containing* `editor/` on sys.path
+    # Direct script / Nix-store wrapper: put the directory *containing* `frag/` on sys.path
     for _parent in Path(__file__).resolve().parents:
-        if (_parent / "editor" / "modular_editor.py").exists():
+        if (_parent / "src/frag" / "modular_editor.py").exists():
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.modular_editor import ModularBlockEditor
-    from editor.ui.components.cmdline import CommandInput
-    from editor.ui.components.inputs import VimTextArea
-    from editor.ui.components.smartedit import SmartEditScreen
-    from editor.ui.components.tree import NavigableTree
-    from editor.ui.components.undotree import UndoTreePanel
-    from editor.ui.strategies.command import CommandStrategy
-    from editor.ui.strategies.history import HistoryStrategy
-    from editor.ui.strategies.mutation import DefaultMutationStrategy
-    from editor.ui.strategies.navigation import DefaultNavigationStrategy
-    from editor.ui.strategies.search import SearchStrategy
-    from editor.ui.strategies.stage import StageStrategy
-    from editor.ui.strategies.workspace import WorkspaceStrategy
+    from frag.modular_editor import ModularBlockEditor
+    from frag.ui.components.cmdline import CommandInput
+    from frag.ui.components.inputs import VimTextArea
+    from frag.ui.components.smartedit import SmartEditScreen
+    from frag.ui.components.tree import NavigableTree
+    from frag.ui.components.undotree import UndoTreePanel
+    from frag.ui.strategies.command import CommandStrategy
+    from frag.ui.strategies.history import HistoryStrategy
+    from frag.ui.strategies.mutation import DefaultMutationStrategy
+    from frag.ui.strategies.navigation import DefaultNavigationStrategy
+    from frag.ui.strategies.search import SearchStrategy
+    from frag.ui.strategies.stage import StageStrategy
+    from frag.ui.strategies.workspace import WorkspaceStrategy
 
 
 class ModularEditorTUI(App):
@@ -125,7 +125,7 @@ class ModularEditorTUI(App):
             # Empty/non-Python folder: use a not-yet-existing placeholder rather than read_text() on a directory
             self.filepath = py_files[0].resolve() if py_files else (self.filepath / "untitled.py")
 
-        self.editor = ModularBlockEditor(str(self.filepath))
+        self.frag = ModularBlockEditor(str(self.filepath))
         self.language = self._detect_language()
         self.initial_anchor = initial_anchor
         self.start_in_workspace = start_in_workspace
@@ -188,7 +188,7 @@ class ModularEditorTUI(App):
             self.navigation_strategy.set_filesystem_mode(directory_mode=True)
         else:
             self.navigation_strategy.populate_tree()
-        if self.editor.blocks:
+        if self.frag.blocks:
             self.navigation_strategy.select_block(0)  # whole file in the active buffer
 
     def refresh_buffer_label(self) -> None:
@@ -303,7 +303,7 @@ class ModularEditorTUI(App):
         self.workspace_strategy.delete("")
 
     def action_smart_edit(self) -> None:
-        if self.editor is None:
+        if self.frag is None:
             return
         self.push_screen(SmartEditScreen(), self._after_smart_edit)
 
@@ -334,7 +334,7 @@ class ModularEditorTUI(App):
         self.mutation_strategy.commit()
 
     def action_refresh_tree(self) -> None:
-        self.editor.parse_document()
+        self.frag.parse_document()
         self.navigation_strategy.populate_tree()
         self.log_status("[#00d7ff]AST Tree re-parsed and refreshed.[/#00d7ff]")
 

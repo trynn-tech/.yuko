@@ -1,4 +1,4 @@
-"""modules/synths/src/editor/ui/strategies/__init__"""
+"""src/frag/ui/strategies/__init__"""
 
 from .navigation import DefaultNavigationStrategy
 from .mutation import DefaultMutationStrategy

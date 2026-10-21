@@ -1,4 +1,4 @@
-# editor/ui/components/tree.py
+# frag/ui/components/tree.py
 from typing import Optional
 
 from textual.binding import Binding

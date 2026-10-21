@@ -1,4 +1,4 @@
-"""modules/synths/src/editor/ui/__init__"""
+"""src/frag/ui/__init__"""
 """UI module components and main TUI application."""
 
 from .app import ModularEditorTUI

@@ -33,23 +33,26 @@
     shell.default = true;
     shell.zsh.enable = true;
 
+    # Frag TUI Editor
+    frag = {
+      enable = true;
+      defaultWorkspace = "~/workspace";
+    };
+
     # -----------------------------------------------------------------
     # Network Construction Automation
     # -----------------------------------------------------------------
     networking.construct.enable = true;
-
     synths = {
       enable = true;
       modelName = "architect";
       apiBase = "http://localhost:8081/v1";
       searxngBase = "http://localhost:8888";
     };
-
     wan = {
       enable = true;
       wanInterface = "vm-fob-wan";
     };
-
     openwrt-provision = {
       enable = true;
       memory = 2048;

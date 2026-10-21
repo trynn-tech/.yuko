@@ -232,7 +232,7 @@ def apply_plan(editor, plan: Sequence[PlannedEdit]) -> int:
     try:
         from ..modular_editor import CodeBlock  # type: ignore
     except (ImportError, ValueError):
-        from editor.modular_editor import CodeBlock
+        from frag.modular_editor import CodeBlock
     editor.mutation_buffer.clear()
     n = 0
     # apply_batch sorts by start line only (bottom-up) and keeps queue order for ties, so queue

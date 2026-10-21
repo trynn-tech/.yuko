@@ -51,8 +51,9 @@ in
         vd = "nvim -c 'VimwikiMakeDiaryNote'";
         ns = "nh search";
         lg = "lazygit";
+	copy = "rsync -avh -P";
         cat-intake = "echo '(^-.-^)' | cat - <(xclip -o -selection clipboard) <(echo '(^-.-^)') | python -m engine.main -s";
-	frag = "synth-tui";
+	fruit = "frag-tui";
       };
 
       initContent = ''
@@ -209,7 +210,7 @@ in
     };
 
     home.packages = with pkgs; [
-      nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils
+      nh comma gnused tree git tig psmisc wl-clipboard xclip tldr socat findutils rsync
       fortune lolcat aaa jp2a unimatrix sl jq
     ];
   };

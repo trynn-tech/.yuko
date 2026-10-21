@@ -1,4 +1,4 @@
-"""modules/synths/src/editor/ui/components/__init__"""
+"""src/frag/ui/components/__init__"""
 
 from .tree import NavigableTree
 from .inputs import VimTextArea

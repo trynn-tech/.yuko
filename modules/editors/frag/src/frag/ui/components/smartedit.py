@@ -19,9 +19,9 @@ try:
     from .cmdline import CommandInput
     from .inputs import VimTextArea
 except (ImportError, ValueError):
-    from editor.smart_edit import apply_plan, plan_edits, plan_label
-    from editor.ui.components.cmdline import CommandInput
-    from editor.ui.components.inputs import VimTextArea
+    from frag.smart_edit import apply_plan, plan_edits, plan_label
+    from frag.ui.components.cmdline import CommandInput
+    from frag.ui.components.inputs import VimTextArea
 
 ICON = {"replace": ("~", "#ffb86c"), "unchanged": ("=", "#888888"), "insert_after": ("+", "#00ffaf"),
         "insert_before": ("+", "#00ffaf"), "error": ("!", "#ff5555")}
@@ -92,7 +92,7 @@ class SmartEditScreen(ModalScreen):
         text = self.query_one("#smart-input", VimTextArea).text
         log = self.query_one("#smart-plan", RichLog)
         log.clear()
-        ed = self.app.editor
+        ed = self.app.frag
         self._plan, self._error = plan_edits(ed.raw_code, ed.blocks, text, self.app.selected_block_id, self._is_python())
         if not text.strip():
             log.write(Text("Paste code on the left.", style="dim"))
@@ -174,7 +174,7 @@ class SmartEditScreen(ModalScreen):
         if not any(p.applies for p in self._plan):
             self.app.log_status("[#ffb86c]Nothing to apply.[/#ffb86c]")
             return
-        ed = self.app.editor
+        ed = self.app.frag
         if ed.mutation_buffer:
             self.app.log_status(f"[#ffb86c]Dropped {len(ed.mutation_buffer)} queued op(s): smart edit applies as one batch.[/#ffb86c]")
         apply_plan(ed, self._plan)

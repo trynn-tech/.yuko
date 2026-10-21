@@ -21,7 +21,7 @@ except (ImportError, ValueError):
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.ui.base import BaseEditorStrategy
+    from frag.ui.base import BaseEditorStrategy
 
 OPS = ("replace", "insert_before", "insert_after", "smart_replace")
 

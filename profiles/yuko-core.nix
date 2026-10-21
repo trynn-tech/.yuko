@@ -12,7 +12,7 @@
   # Global packages available to Yuko
   # -------------------------------
   home.packages = with pkgs; [
-    sonobus 
+    sonobus
   ];
 
   # -------------------------------
@@ -31,8 +31,15 @@
     dev.nix.enable = true;
     dev.nix.formatter = "nixfmt";
 
-    # Terminal Interface
+    # Terminal Interface & Zsh
     shell.default = true;
+    shell.zsh.enable = true;
+
+    # Frag TUI Editor
+    frag = {
+      enable = true;
+      defaultWorkspace = "~/workspace";
+    };
 
     # -----------------------------------------------------------------
     # Central Local AI Controller Endpoint Matrix
@@ -43,8 +50,5 @@
       apiBase = "http://localhost:8081/v1";
       searxngBase = "http://localhost:8888";
     };
-
-    # Zsh configuration
-    shell.zsh.enable = true;
   };
 }

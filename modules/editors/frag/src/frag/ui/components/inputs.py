@@ -22,7 +22,7 @@ from textual.widgets.text_area import Selection
 try:
     from .vimcore import VISUAL_MODES, VimEngine, _first_nonblank, _line_end, _line_start
 except (ImportError, ValueError):
-    from editor.ui.components.vimcore import VISUAL_MODES, VimEngine, _first_nonblank, _line_end, _line_start  # noqa: F401
+    from frag.ui.components.vimcore import VISUAL_MODES, VimEngine, _first_nonblank, _line_end, _line_start  # noqa: F401
 
 
 class VimTextArea(TextArea):

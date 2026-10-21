@@ -29,7 +29,7 @@ from textual.widgets.option_list import Option
 try:
     from ...undo_tree import UndoTree, layout_graph
 except (ImportError, ValueError):
-    from editor.undo_tree import UndoTree, layout_graph
+    from frag.undo_tree import UndoTree, layout_graph
 
 MAX_DIFF_LINES = 400
 

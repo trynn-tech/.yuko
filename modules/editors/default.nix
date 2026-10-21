@@ -7,6 +7,7 @@ in
 {
   imports = [
     ./task_org.nix
+    ./frag
   ];
 
   programs.nixvim = {
@@ -68,97 +69,6 @@ in
       local builtin = require('telescope.builtin')
       local actions = require('telescope.actions')
       local action_state = require('telescope.actions.state')
-
-      -- =====================================================================
-      -- TELESCOPE DYNAMIC LINE WINDOW MODULE (Option A)
-      -- =====================================================================
-      local SynthTelescope = {}
-
-      local function get_bounded_window(anchor_line, radius, total_lines)
-        local start_line = math.max(1, anchor_line - radius)
-        local end_line = math.min(total_lines, anchor_line + radius)
-        return start_line, end_line
-      end
-
-      -- Action 1: Select the line-window directly in the current Neovim buffer
-      function SynthTelescope.select_in_buffer(prompt_bufnr, radius)
-        radius = radius or 3
-        local selection = action_state.get_selected_entry()
-        actions.close(prompt_bufnr)
-
-        if not selection then return end
-
-        local anchor_line = selection.linenr or selection.lnum
-        if not anchor_line then
-          vim.notify("No valid line number found in selection", vim.log.levels.WARN)
-          return
-        end
-
-        local total_lines = vim.api.nvim_buf_line_count(0)
-        local start_line, end_line = get_bounded_window(anchor_line, radius, total_lines)
-
-        -- Position cursor and activate line visual selection across the edit window
-        vim.api.nvim_win_set_cursor(0, { start_line, 0 })
-        vim.cmd("normal! V")
-        vim.api.nvim_win_set_cursor(0, { end_line, 0 })
-
-        vim.notify(
-          string.format("Selected Edit Window: L%d..L%d (Anchor: %d, Radius: ±%d)", start_line, end_line, anchor_line, radius),
-          vim.log.levels.INFO
-        )
-      end
-
-      -- Action 2: Open synth-tui passing file path and anchor line
-      function SynthTelescope.open_in_synth_tui(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        actions.close(prompt_bufnr)
-
-        if not selection then return end
-
-        local anchor_line = selection.linenr or selection.lnum or 1
-        local filename = selection.filename or vim.api.nvim_buf_get_name(0)
-
-        if not filename or filename == "" then
-          vim.notify("No valid file attached to entry", vim.log.levels.ERROR)
-          return
-        end
-
-        local cmd = string.format("synth-tui %s %d", vim.fn.shellescape(filename), anchor_line)
-        vim.cmd("botright 15sp | terminal " .. cmd)
-      end
-
-      -- Main Picker Function
-      function SynthTelescope.find_window(opts)
-        opts = opts or {}
-        local radius = opts.radius or 3
-
-        builtin.current_buffer_fuzzy_find({
-          prompt_title = string.format("Line Window Search (Radius: ±%d)", radius),
-          attach_mappings = function(_, map)
-            -- <C-w> or <CR>: Highlight dynamic edit window in buffer
-            map("i", "<C-w>", function(bufnr) SynthTelescope.select_in_buffer(bufnr, radius) end)
-            map("n", "<C-w>", function(bufnr) SynthTelescope.select_in_buffer(bufnr, radius) end)
-
-            -- <C-t>: Launch synth-tui on target anchor
-            map("i", "<C-t>", SynthTelescope.open_in_synth_tui)
-            map("n", "<C-t>", SynthTelescope.open_in_synth_tui)
-
-            return true
-          end,
-        })
-      end
-
-      -- =====================================================================
-      -- KEYMAPS
-      -- =====================================================================
-      -- Telescope Find Window Maps
-      vim.keymap.set("n", "<leader>sw", function()
-        SynthTelescope.find_window({ radius = 3 })
-      end, { desc = "Find Line Window (±3 lines)" })
-
-      vim.keymap.set("n", "<leader>sW", function()
-        SynthTelescope.find_window({ radius = 8 })
-      end, { desc = "Find Large Line Window (±8 lines)" })
 
       -- fzf find a file buffer
       vim.keymap.set("n", "<leader>ff", builtin.find_files, { desc = "Find Files" })

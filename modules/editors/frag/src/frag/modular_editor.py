@@ -1,4 +1,4 @@
-# modules/synth/src/editor/modular_editor.py
+# src/frag/modular_editor.py
 import difflib
 import re
 from dataclasses import dataclass, field
@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import tree_sitter
-from engine.analyzer import HAS_TREE_SITTER, LANGUAGES, CodeAnalyzer, Parser
+from frag.analyzer import HAS_TREE_SITTER, LANGUAGES, CodeAnalyzer, Parser
 
 
 @dataclass

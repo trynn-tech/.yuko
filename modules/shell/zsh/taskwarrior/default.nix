@@ -167,7 +167,13 @@ in
     };
 
     programs.zsh.initContent = ''
-      task-carousel >/dev/null 2>&1
+
+      # Only run if this specific shell session hasn't checked it, and it hasn't run globally today
+      if [[ -z "$TASK_CAROUSEL_RAN" && "$(cat ~/.local/share/task/carousel.lock 2>/dev/null)" != "$(date +%Y-%m-%d)" ]]; then
+        export TASK_CAROUSEL_RAN=1
+        task-carousel >/dev/null 2>&1
+      fi
+
 
       it() {
         while true; do

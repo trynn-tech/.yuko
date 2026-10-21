@@ -17,21 +17,17 @@ let
     podman
   ];
 
+  # Define textual-vim locally since it is not packaged in upstream Nixpkgs
   textual-vim = pkgs.python3Packages.buildPythonPackage rec {
     pname = "textual-vim";
     version = "0.1.0";
-    
     pyproject = true;
 
     src = pkgs.fetchFromGitHub {
       owner = "davidbrochart";
       repo = "textual-vim";
       rev = "v${version}";
-      
-      # Forces Nix to clone the git repository directly without using a tarball URL
-      forceFetchGit = true; 
-      
-      # Throw an intentional fake hash structure to capture the true git directory layout hash
+      forceFetchGit = true;
       hash = "sha256-oi8s4iotR9wkZmQz7lJd60n/uo2wEOrZKzLHYWOph2g=";
     };
 
@@ -79,7 +75,6 @@ let
     numba
   ]);
 
-
   synthPackage = pkgs.stdenv.mkDerivation {
     pname = "local-synth-engine";
     version = "0.1.0";
@@ -90,33 +85,26 @@ let
     installPhase = ''
       mkdir -p $out/libexec/synth-engine $out/bin
 
+      # Copy all source files directly to libexec root since modules (engine, coordinator, etc.) sit under src/
       if [ -d src ]; then
         cp -r src/* $out/libexec/synth-engine/
       else
         cp -r * $out/libexec/synth-engine/
       fi
 
-      # Primary CLI Engine
+      if [ -d tests ]; then
+        cp -r tests $out/libexec/synth-engine/
+      fi
+
+      # Primary Backend CLI Engine Execution
       makeWrapper ${pythonEnv}/bin/python $out/bin/synth \
         --add-flags "$out/libexec/synth-engine/main.py" \
         --set PYTHONPATH "$out/libexec/synth-engine" \
         --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
-
-      # CLI Editor Binary
-      makeWrapper ${pythonEnv}/bin/python $out/bin/synth-editor \
-        --add-flags "$out/libexec/synth-engine/editor/cli_editor.py" \
-        --set PYTHONPATH "$out/libexec/synth-engine" \
-        --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
-
-      # Interactive Textual TUI Binary (Direct UI module execution)
-      makeWrapper ${pythonEnv}/bin/python $out/bin/synth-tui \
-        --add-flags "$out/libexec/synth-engine/editor/ui/app.py" \
-        --set PYTHONPATH "$out/libexec/synth-engine" \
-        --prefix PATH : ${lib.makeBinPath nativeTools}:${pythonEnv}/bin
     '';
   };
-
-in {
+in
+{
   options.yuko.synths = {
     enable = lib.mkEnableOption "Custom Nix-bound local AI editing engine";
 
@@ -214,7 +202,6 @@ in {
       SYNTH_API_BASE = cfg.apiBase;
       SYNTH_MODEL_NAME = cfg.modelName;
       SYNTH_SEARXNG_BASE = cfg.searxngBase;
-      PYTHONPATH = "$HOME/.config/synths/src:$PYTHONPATH";
     };
   };
 }

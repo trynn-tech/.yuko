@@ -1,6 +1,6 @@
 """Navigation strategy for single-file AST semantic breakdown and workspace directory exploration.
-
 Workspace files carry spreadsheet-style alphabetical codes ([a] .. [z], [aa] .. [ab]).
+
 Jump-input semantics:
   * digits  -> AST block index (single-file mode) / file index (workspace mode)
   * letters -> workspace file code (works in both modes)
@@ -21,15 +21,15 @@ try:
     from ..base import NavigationStrategy
     from ..components.tree import NavigableTree
 except (ImportError, ValueError):
-    # Direct script / Nix execution: put the directory *containing* `editor/` on sys.path
+    # Direct script / Nix execution: put the directory *containing* `frag/` on sys.path
     for _parent in Path(__file__).resolve().parents:
         if (_parent / "editor" / "modular_editor.py").exists():
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.modular_editor import ModularBlockEditor
-    from editor.ui.base import NavigationStrategy
-    from editor.ui.components.tree import NavigableTree
+    from frag.modular_editor import ModularBlockEditor
+    from frag.ui.base import NavigationStrategy
+    from frag.ui.components.tree import NavigableTree
 
 # Single source of truth: tree population and index lookup MUST skip the same entries,
 # otherwise the [a]/[ab] labels drift away from the files they resolve to.
@@ -46,7 +46,6 @@ SKIP_NAMES = frozenset(
     }
 )
 
-
 WORKSPACE_EXPAND_DEPTH = 1  # workspace mode: folders this many levels below the root start unfolded
 
 
@@ -62,8 +61,22 @@ class DefaultNavigationStrategy(NavigationStrategy):
         super().__init__(*args, **kwargs)
         self.directory_mode: bool = False
         self.fs_root_path: Optional[Path] = None
-        self.workspace_selected: Optional[Path] = None     # persists across tree rebuilds
+        self.workspace_selected: Optional[Path] = None  # persists across tree rebuilds
         self._fs_nodes: Dict[Path, TreeNode] = {}
+
+    @property
+    def frag(self):
+        """Directly return the active editor instance or safely initialize a fallback."""
+        if hasattr(self.app, "editor") and self.app.editor is not None:
+            return self.app.editor
+        if not hasattr(self.app, "_internal_editor") or self.app._internal_editor is None:
+            fp = getattr(self.app, "filepath", None)
+            target = str(fp) if fp else "."
+            try:
+                self.app._internal_editor = ModularBlockEditor(target)
+            except Exception:
+                self.app._internal_editor = ModularBlockEditor()
+        return self.app._internal_editor
 
     # ------------------------------------------------------------------
     # Spreadsheet-style base-26 helpers
@@ -97,6 +110,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
     # ------------------------------------------------------------------
     def set_filesystem_mode(self, directory_mode: bool, root_path: Optional[Path] = None) -> None:
         """Toggles Workspace Directory mode vs single-file AST mode.
+
         The workspace root is resolved once and then kept stable so file codes
         do not shift while you open files from sub-folders.
         """
@@ -151,6 +165,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
     # ------------------------------------------------------------------
     def _copy_text(self, text: str) -> bool:
         """Copies to the system clipboard (wl-copy / xclip / xsel), falling back to OSC52.
+
         Always mirrors into app.internal_yank_buffer so Vim `p` can paste it.
         """
         self.app.internal_yank_buffer = text
@@ -205,7 +220,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
                     if p.is_file():
                         return self._yank_file_content(p)
                     else:
-                        # If a directory is targeted, yank its path string representation
                         p_str = str(p.resolve())
                         self._copy_text(p_str)
                         self.app.log_status(f"[bold #00ffaf]Yanked directory path to clipboard:[/bold #00ffaf] {escape(p_str)}")
@@ -226,7 +240,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
             if isinstance(target, int):
                 if self.directory_mode:
                     return self._yank_file_index(target)
-                block = next((b for b in self.editor.blocks if b.index == target), None)
+                block = next((b for b in self.frag.blocks if b.index == target), None)
                 if block is None:
                     self.app.log_status(f"[bold #ff5f5f]No block [{target}] to yank.[/bold #ff5f5f]")
                     return False
@@ -251,13 +265,13 @@ class DefaultNavigationStrategy(NavigationStrategy):
     # ------------------------------------------------------------------
     def resolve_anchor(self, line_num: int) -> Optional[int]:
         """Returns the index of a block covering `line_num` (creating a ±3 window if supported)."""
-        if hasattr(self.editor, "create_line_window_block"):
-            block = self.editor.create_line_window_block(line_num, radius=3)
+        if hasattr(self.frag, "create_line_window_block"):
+            block = self.frag.create_line_window_block(line_num, radius=3)
             if block is not None:
                 self.populate_tree()
-                return block.index  # create_line_window_block returns a CodeBlock, not an int
+                return block.index
         matching = [
-            b for b in self.editor.blocks
+            b for b in self.frag.blocks
             if b.index != 0 and b.start_line <= line_num <= b.end_line
         ]
         if matching:
@@ -283,20 +297,20 @@ class DefaultNavigationStrategy(NavigationStrategy):
         return self._open_file_by_index(n)
 
     def _focus_block(self, block_idx: int) -> bool:
-        if not any(b.index == block_idx for b in self.editor.blocks):
+        if not any(b.index == block_idx for b in self.frag.blocks):
             self.app.log_status(f"[bold #ff5f5f]Block ID {block_idx} not found.[/bold #ff5f5f]")
             return False
         try:
             self.app.query_one("#ast-tree", NavigableTree).jump_to_block_id(block_idx)
         except Exception:
-            pass  # tree highlight is cosmetic; selection below is what matters
+            pass
         return self.select_block(block_idx)
 
     def _open_file_by_index(self, n: int) -> bool:
         files = self._workspace_files()
         if 1 <= n <= len(files):
             if self.directory_mode:
-                return self._select_workspace_file(files[n - 1], n)  # select + keep browsing
+                return self._select_workspace_file(files[n - 1], n)
             return self.select_block({"type": "file", "path": files[n - 1]})
         label = str(n) if self.directory_mode else self._index_to_alpha(n)
         self.app.log_status(
@@ -317,8 +331,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
         def place() -> None:
             tree.move_cursor(node)
             tree.scroll_to_node(node)
-
-        tree.call_after_refresh(place)  # line numbers are only valid after the re-layout
+        tree.call_after_refresh(place)
         return True
 
     def _select_workspace_file(self, path: Path, n: Optional[int] = None) -> bool:
@@ -358,7 +371,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
                 fp = getattr(self.app, "filepath", None)
                 is_active = bool(fp) and entry_path.resolve() == Path(fp).resolve()
                 icon = "🎯" if is_active else "📄"
-                # "\[" escapes Rich markup, otherwise "[a]" is parsed as a style tag and vanishes
                 leaf = parent_node.add_leaf(
                     f"\\[{alpha}] {icon} {escape(entry.name)}",
                     data={"type": "file", "path": entry_path, "index": n, "alpha": alpha},
@@ -371,7 +383,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
         self._fs_nodes.clear()
         base_dir = self._get_base_dir()
 
-        # Mode A: Workspace Directory View (numbered 1, 2, 3 ...; first level of folders unfolded)
         if self.directory_mode:
             tree.root.label = f"📂 Workspace ({escape(base_dir.name)}/)"
             tree.root.data = {"type": "directory", "path": base_dir}
@@ -380,8 +391,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
             self._restore_workspace_cursor()
             return
 
-        # Mode B: Single-File AST Explorer
-        root_block = self.editor.blocks[0] if self.editor.blocks else None
+        root_block = self.frag.blocks[0] if self.frag.blocks else None
         fp = getattr(self.app, "filepath", None)
         root_name = root_block.name if root_block else (Path(fp).name if fp else "file.py")
         tree.root.label = f"📄 \\[0] Entire File ({escape(root_name)})"
@@ -401,7 +411,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
         self._populate_directory_node(cat_nodes["filesystem"], base_dir, [0])
 
         stage_nodes: Dict[int, TreeNode] = {
-            n: tree.root.add(f"🏷️ Stage {n}", expand=True) for n in sorted(self.editor.stages.keys())
+            n: tree.root.add(f"🏷️ Stage {n}", expand=True) for n in sorted(self.frag.stages.keys())
         }
 
         import_regex = re.compile(
@@ -410,9 +420,9 @@ class DefaultNavigationStrategy(NavigationStrategy):
         class_regex = re.compile(
             r"^\s*(class\s+|struct\ |impl\ |trait\ |interface\ |type\ \w+\ =\ struct)", re.IGNORECASE
         )
+        blocks_by_idx = {b.index: b for b in self.frag.blocks}
 
-        blocks_by_idx = {b.index: b for b in self.editor.blocks}
-        for item in self.editor.get_summary().get("selection_array", []):
+        for item in self.frag.get_summary().get("selection_array", []):
             idx = item["index"]
             if idx == 0:
                 continue
@@ -420,17 +430,14 @@ class DefaultNavigationStrategy(NavigationStrategy):
             name = str(item.get("name", f"Block {idx}"))
             lines = item.get("lines", "")
             stage_id = item.get("stage")
-
             block_obj = blocks_by_idx.get(idx)
             raw_content = block_obj.content if block_obj else ""
-
             badge = (
                 f"[bold #00d7ff]STAGE {stage_id}[/bold #00d7ff]"
                 if stage_id is not None
                 else "[dim #555555]\\[UNASSIGNED][/dim #555555]"
             )
             label = f"\\[{idx}] {escape(name)} ({lines}) {badge}"
-
             is_window = name.startswith("Window L")
             is_import = (
                 any(k in b_type for k in ("import", "include", "use", "extern"))
@@ -442,7 +449,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
                 or bool(class_regex.search(name))
                 or bool(class_regex.search(raw_content))
             )
-
             if is_window:
                 parent = cat_nodes["window"]
             elif stage_id is not None and stage_id in stage_nodes:
@@ -457,7 +463,6 @@ class DefaultNavigationStrategy(NavigationStrategy):
                 parent = cat_nodes["variables"]
             else:
                 parent = cat_nodes["statements"]
-
             parent.add_leaf(label, data=idx)
 
     # ------------------------------------------------------------------
@@ -466,53 +471,45 @@ class DefaultNavigationStrategy(NavigationStrategy):
     def _open_file(self, target_path: Path) -> bool:
         try:
             resolved = target_path.resolve()
-            new_editor = ModularBlockEditor(str(resolved))  # build first: a failure leaves state untouched
+            new_editor = ModularBlockEditor(str(resolved))
         except Exception as e:
             self.app.log_status(f"[bold #ff5f5f]Error opening {escape(target_path.name)}:[/bold #ff5f5f] {escape(str(e))}")
             return False
-
-        pending = len(getattr(self.app.editor, "mutation_buffer", []) or [])
+        pending = len(getattr(self.app.frag, "mutation_buffer", []) or [])
         if pending:
             self.app.log_status(f"[bold #ffb86c]Discarded {pending} unapplied mutation(s) from previous file.[/bold #ffb86c]")
-
         self.app.filepath = resolved
-        self.app.editor = new_editor  # `self.editor` is a read-only property; set on the app
+        self.app.editor = new_editor
         self.app.language = self.app._detect_language()
         self.app.title = f"Modular Editor — {resolved.name}"
-
         if self.fs_root_path is None:
             self.fs_root_path = resolved.parent
-
         self.app.selected_block_id = None
-        
-        # Keep directory mode active if we were already browsing the workspace accordion view
         if not self.directory_mode:
             self.directory_mode = False
-
         history = getattr(self.app, "history_strategy", None)
         if history:
-            history.attach()  # per-file undo tree; records out-of-band edits as a state
-
+            history.attach()
         self.populate_tree()
         self.app.log_status(f"[bold #00ffaf]Opened File:[/bold #00ffaf] {escape(resolved.name)}")
-        return self.select_block(0)  # load the whole file into the active buffer
+        return self.select_block(0)
 
     def snapshot_selection(self) -> Optional[tuple]:
-        """Identity of the selected block that survives a re-parse (indices shift, names mostly don't)."""
+        """Identity of the selected block that survives a re-parse."""
         sid = self.app.selected_block_id
-        block = next((b for b in self.editor.blocks if b.index == sid), None) if sid is not None else None
+        block = next((b for b in self.frag.blocks if b.index == sid), None) if sid is not None else None
         return None if block is None else (block.index, block.block_type, block.name, block.start_line)
 
     def restore_selection(self, snap: Optional[tuple]) -> bool:
-        """Re-selects the block described by `snap` after the document was re-indexed."""
+        """Re-selects the block described by `snap` after document re-indexing."""
         if snap is None:
             return False
         idx, b_type, name, start = snap
         if idx == 0:
             return self.select_block(0)
-        others = [b for b in self.editor.blocks if b.index != 0]
+        others = [b for b in self.frag.blocks if b.index != 0]
         same = [b for b in others if b.block_type == b_type and b.name == name]
-        pool = same or [b for b in others if b.block_type == b_type]  # renamed: nearest of same kind
+        pool = same or [b for b in others if b.block_type == b_type]
         if not pool:
             return self.select_block(0)
         return self.select_block(min(pool, key=lambda b: abs(b.start_line - start)).index)
@@ -525,19 +522,16 @@ class DefaultNavigationStrategy(NavigationStrategy):
             if node_type == "file" and target_path and Path(target_path).is_file():
                 return self._open_file(Path(target_path))
             if node_type == "directory":
-                # Do NOT change fs_root_path here: it would desync the tree's [a]/[ab] labels.
                 self.app.log_status(f"[#00d7ff]Selected Folder:[/#00d7ff] {escape(str(target_path))}")
                 return True
             return False
-
         if isinstance(target, str):
             target = target.strip()
             if not target.isdigit():
-                return self.jump_to_block(target)  # alphabetical file code
+                return self.jump_to_block(target)
             target = int(target)
-
         if isinstance(target, int):
-            block = next((b for b in self.editor.blocks if b.index == target), None)
+            block = next((b for b in self.frag.blocks if b.index == target), None)
             if block is None:
                 self.app.log_status(f"[bold #ff5f5f]Error:[/bold #ff5f5f] Invalid block index [{target}].")
                 return False
@@ -555,8 +549,7 @@ class DefaultNavigationStrategy(NavigationStrategy):
                 )
             self.app.selected_block_id = block.index
             self.app.log_status(
-                f"[#00ffaf]Selected Block [{block.index}]:[/#00ffaf] {escape(block.name)} ({block.block_type})"
+                f"[bold #00ffaf]Selected Block [{block.index}]:[/bold #00ffaf] {escape(block.name)} ({block.block_type})"
             )
             return True
-
         return False

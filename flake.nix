@@ -18,10 +18,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Autonomous Subrepo / Submodule Inputs
     synths.url = "path:./modules/synths";
+    frag.url = "path:./modules/editors/frag";
   };
 
-  outputs = { self, nixpkgs, home-manager, nur, nixvim, nix-alien, microvm, synths, ... } @ inputs:
+  outputs = { self, nixpkgs, home-manager, nur, nixvim, nix-alien, microvm, synths, frag, ... } @ inputs:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -40,13 +42,17 @@
           import ./.yuko-env.example.nix;
 
       # Helper to instantiate Home Manager profiles consistently
-      mkYuko = { userName, homeDir, profileModule }:
+      mkYuko = { userName, homeDir, profileModule, extraModules ? [] }:
         home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = { inherit inputs; };
           modules = [
             profileModule
             nixvim.homeModules.nixvim
+            # Register module definitions so options like yuko.frag and yuko.synths are recognized
+            ./modules/synths
+            ./modules/editors/frag
+          ] ++ extraModules ++ [
             {
               home.username = userName;
               home.homeDirectory = homeDir;
@@ -57,25 +63,19 @@
     in
     {
       homeConfigurations = {
-        # Core Workstation Profile (can import networking analysis tools)
+        # Core Workstation Profile (Enables frag & synths in profiles/yuko-core.nix)
         yuko-core = mkYuko {
           inherit (yukoEnv) userName homeDir;
           profileModule = ./profiles/yuko-core.nix;
         };
 
-        # Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
+        # Forward Operating Base Profile
         yuko-fob = mkYuko {
           inherit (yukoEnv) userName homeDir;
           profileModule = ./profiles/yuko-fob.nix;
         };
 
-        # Mobile Networking Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
-        yuko-mobile-fob = mkYuko {
-          inherit (yukoEnv) userName homeDir;
-          profileModule = ./profiles/yuko-mobile-fob.nix;
-        };
-
-        # Forward Operating Base Profile (provisions and runs local OpenWrt QEMU sandbox)
+        # Minimal / Windows Sandbox Profile (Can selectively omit yuko.frag / yuko.synths)
         yuko-windows = mkYuko {
           inherit (yukoEnv) userName homeDir;
           profileModule = ./profiles/yuko-windows.nix;

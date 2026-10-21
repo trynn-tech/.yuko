@@ -20,8 +20,8 @@ except (ImportError, ValueError):
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.ui.base import BaseEditorStrategy
-    from editor.ui.components.confirm import ConfirmScreen
+    from frag.ui.base import BaseEditorStrategy
+    from frag.ui.components.confirm import ConfirmScreen
 
 
 class WorkspaceStrategy(BaseEditorStrategy):

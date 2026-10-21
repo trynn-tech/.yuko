@@ -19,8 +19,8 @@ except (ImportError, ValueError):
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.search import Hit, find_hits
-    from editor.ui.base import BaseEditorStrategy
+    from frag.search import Hit, find_hits
+    from frag.ui.base import BaseEditorStrategy
 
 
 class SearchStrategy(BaseEditorStrategy):
@@ -35,7 +35,7 @@ class SearchStrategy(BaseEditorStrategy):
         if not query:  # `:find` alone repeats the last search
             return self.step(1) if self.hits else self._err("E35: No previous search pattern")
         try:
-            hits, outside = find_hits(self.editor.raw_code, self.editor.blocks, query)
+            hits, outside = find_hits(self.frag.raw_code, self.frag.blocks, query)
         except Exception as e:  # bad regex
             return self._err(f"E486: Invalid pattern: {e}")
         self.query, self.hits, self.pos = query, hits, -1
@@ -44,7 +44,7 @@ class SearchStrategy(BaseEditorStrategy):
             return self._err(f"E486: Pattern not found: {query}{extra}")
 
         # start at the first hit at/after the selected block (wrapping), like Vim's search from the cursor
-        sel = next((b for b in self.editor.blocks if b.index == self.app.selected_block_id), None)
+        sel = next((b for b in self.frag.blocks if b.index == self.app.selected_block_id), None)
         start_line = sel.start_line if sel is not None and sel.index != 0 else 0
         first = next((i for i, h in enumerate(hits) if h.line >= start_line), 0)
         return self._goto(first)
@@ -60,7 +60,7 @@ class SearchStrategy(BaseEditorStrategy):
         nav = self.app.navigation_strategy
         if not nav._focus_block(hit.block_index):
             return False
-        block = next((b for b in self.editor.blocks if b.index == hit.block_index), None)
+        block = next((b for b in self.frag.blocks if b.index == hit.block_index), None)
         area = self.app.query_one("#content-input")
         if block is not None:
             try:

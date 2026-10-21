@@ -8,7 +8,7 @@ let
   # Offline detection and prompt script
   offlinePromptScript = pkgs.writeScriptBin "yuko-offline-check" ''
     #!${pkgs.bash}/bin/bash
-    
+
     # Quick connectivity check against a reliable IP
     if ! ${pkgs.iputils}/bin/ping -c 1 -w 2 1.1.1.1 &>/dev/null; then
       echo "--------------------------------------------------------"
@@ -36,7 +36,6 @@ let
   # Export script to backup /etc/nixos, ~/.yuko, and all local binary NAR iterations
   yukoExportScript = pkgs.writeShellScriptBin "yuko-export" ''
     #!${pkgs.bash}/bin/bash
-
     TARGET_MOUNT="''${1:-/mnt}"
     BACKUP_DIR="$TARGET_MOUNT/yuko-backups"
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)

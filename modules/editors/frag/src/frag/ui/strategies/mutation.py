@@ -1,4 +1,4 @@
-# editor/ui/strategies/mutation.py
+# frag/ui/strategies/mutation.py
 from pathlib import Path
 from typing import Optional
 
@@ -7,7 +7,7 @@ from rich.markup import escape
 try:
     from ..components.inputs import VimTextArea
 except (ImportError, ValueError):
-    from editor.ui.components.inputs import VimTextArea
+    from frag.ui.components.inputs import VimTextArea
 
 
 class DefaultMutationStrategy:
@@ -29,10 +29,10 @@ class DefaultMutationStrategy:
             return False
 
         target = target_id if target_id is not None else self.app.selected_block_id
-        self.app.editor.queue_mutation(op_type, [target], content)
+        self.app.frag.queue_mutation(op_type, [target], content)
         self.app.log_status(
             f"[bold #00ffaf]Queued {op_type}:[/bold #00ffaf] Block \\[{target}] "
-            f"(Buffer size: {len(self.app.editor.mutation_buffer)})"
+            f"(Buffer size: {len(self.app.frag.mutation_buffer)})"
         )
         # NOTE: the buffer is also the preview now, so it is deliberately NOT cleared here.
         return True
@@ -40,7 +40,7 @@ class DefaultMutationStrategy:
     # --- applying -------------------------------------------------------
 
     def _describe_buffer(self) -> str:
-        editor = self.app.editor
+        editor = self.app.frag
         by_index = {b.index: b for b in editor.blocks}
         parts = []
         for op in editor.mutation_buffer:
@@ -53,7 +53,7 @@ class DefaultMutationStrategy:
 
     def apply(self, label: Optional[str] = None) -> bool:
         """Applies queued ops, writes the file, and records a history state."""
-        editor = self.app.editor
+        editor = self.app.frag
         if not editor.mutation_buffer:
             self.app.log_status("[bold #ffb86c]Buffer empty.[/bold #ffb86c] Nothing to apply.")
             return False
@@ -85,7 +85,7 @@ class DefaultMutationStrategy:
 
         area = self.app.query_one("#content-input", VimTextArea)
         op_type = self.app.mutation_op
-        block = next((b for b in self.app.editor.blocks if b.index == block_id), None)
+        block = next((b for b in self.app.frag.blocks if b.index == block_id), None)
         if op_type == "replace" and block is not None and area.text == block.content:
             self.app.log_status("[#ffb86c]No changes in buffer.[/#ffb86c]")
             return False
@@ -95,10 +95,10 @@ class DefaultMutationStrategy:
     # --- buffer management ----------------------------------------------
 
     def clear(self) -> None:
-        self.app.editor.mutation_buffer.clear()
+        self.app.frag.mutation_buffer.clear()
         self.app.log_status("[bold #ffb86c]Mutation buffer cleared.[/bold #ffb86c]")
 
     def pop(self) -> None:
-        if self.app.editor.mutation_buffer:
-            popped = self.app.editor.mutation_buffer.pop()
+        if self.app.frag.mutation_buffer:
+            popped = self.app.frag.mutation_buffer.pop()
             self.app.log_status(f"[bold #ffb86c]Popped mutation:[/bold #ffb86c] {escape(str(popped))}")

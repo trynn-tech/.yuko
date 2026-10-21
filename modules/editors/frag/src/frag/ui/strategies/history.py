@@ -1,14 +1,11 @@
 """History strategy: per-file undo trees; every checkout is written straight to disk.
-
 Disk is the single source of truth and the undo tree is the safety net, so there is
 no separate "buffer state" to manage: commit (Enter) records a state, `u` / Ctrl+R /
-g- / g+ / the UndoTree panel move between states and re-write the file.
-"""
+g- / g+ / the UndoTree panel move between states and re-write the file."""
 
 import sys
 from pathlib import Path
 from typing import Dict, Optional
-
 from rich.markup import escape
 
 try:
@@ -20,8 +17,8 @@ except (ImportError, ValueError):
             if str(_parent) not in sys.path:
                 sys.path.insert(0, str(_parent))
             break
-    from editor.undo_tree import UndoNode, UndoTree
-    from editor.ui.base import BaseEditorStrategy
+    from frag.undo_tree import UndoNode, UndoTree
+    from frag.ui.base import BaseEditorStrategy
 
 
 class HistoryStrategy(BaseEditorStrategy):
@@ -30,10 +27,52 @@ class HistoryStrategy(BaseEditorStrategy):
         self._trees: Dict[Path, UndoTree] = {}  # survives switching between files
 
     @property
+    def frag(self):
+        """Proxy wrapper ensuring HistoryStrategy can read/write code and buffers directly on the TUI app."""
+        app = self.app
+        if not hasattr(app, "_frag_proxy"):
+            class FragProxy:
+                @property
+                def raw_code(self):
+                    try:
+                        return app.query_one("#content-input").text
+                    except Exception:
+                        return getattr(app, "_raw_code", Path(app.filepath).read_text() if getattr(app, "filepath", None) and Path(app.filepath).exists() else "")
+
+                @raw_code.setter
+                def raw_code(self, val):
+                    app._raw_code = val
+                    try:
+                        app.query_one("#content-input").text = val
+                    except Exception:
+                        pass
+
+                @property
+                def original_code(self):
+                    return getattr(app, "_original_code", self.raw_code)
+
+                @original_code.setter
+                def original_code(self, val):
+                    app._original_code = val
+
+                def parse_document(self):
+                    if hasattr(app, "parse_document"):
+                        app.parse_document()
+
+                @property
+                def mutation_buffer(self):
+                    if not hasattr(app, "_mutation_buffer"):
+                        app._mutation_buffer = []
+                    return app._mutation_buffer
+
+            app._frag_proxy = FragProxy()
+        return app._frag_proxy
+
+    @property
     def tree(self) -> UndoTree:
         key = Path(self.app.filepath).resolve()
         if key not in self._trees:
-            self._trees[key] = UndoTree(self.editor.raw_code, label="Original")
+            self._trees[key] = UndoTree(self.frag.raw_code, label="Original")
         return self._trees[key]
 
     # --- recording -------------------------------------------------------
@@ -41,13 +80,13 @@ class HistoryStrategy(BaseEditorStrategy):
     def attach(self) -> None:
         """Call whenever a file becomes active: records out-of-band edits as their own state."""
         tree = self.tree
-        if tree.current.text != self.editor.raw_code:
-            tree.commit(self.editor.raw_code, "external change")
+        if tree.current.text != self.frag.raw_code:
+            tree.commit(self.frag.raw_code, "external change")
             self.app.log_status("[#ffb86c]File changed outside the editor, recorded as a history state.[/#ffb86c]")
         self._refresh()
 
     def record(self, label: str) -> Optional[UndoNode]:
-        node = self.tree.commit(self.editor.raw_code, label)
+        node = self.tree.commit(self.frag.raw_code, label)
         self._refresh()
         return node
 
@@ -77,21 +116,17 @@ class HistoryStrategy(BaseEditorStrategy):
         if node is None:
             self.app.log_status(f"[#ffb86c]{empty_msg}[/#ffb86c]")
             return False
-
-        editor, nav = self.editor, self.app.navigation_strategy
+        editor, nav = self.frag, self.app.navigation_strategy
         snap = nav.snapshot_selection()
-
         dropped = len(editor.mutation_buffer)
         editor.mutation_buffer.clear()  # queued ops target block indices that are about to change
         editor.raw_code = node.text
         editor.original_code = node.text
         editor.parse_document()
         Path(self.app.filepath).write_text(node.text)
-
         nav.populate_tree()
         nav.restore_selection(snap)
         self._refresh()
-
         extra = f" (dropped {dropped} queued op(s))" if dropped else ""
         self.app.log_status(
             f"[bold #00d7ff]{verb} → state \\[{node.seq}][/bold #00d7ff] {escape(node.label)}, written to disk{extra}"

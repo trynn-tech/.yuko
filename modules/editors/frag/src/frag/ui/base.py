@@ -13,7 +13,7 @@ class BaseEditorStrategy(ABC):
 
     @property
     def editor(self):
-        return self.app.editor
+        return self.app.frag
 
 
 class NavigationStrategy(BaseEditorStrategy):
