@@ -10,42 +10,31 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync-frag:
+  sync-subrepos:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.SUBREPO_SYNC_PAT }}
 
-      - name: Push Frag to GitHub
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.SUBREPO_SYNC_PAT }}
-        with:
-          source-directory: 'modules/editors/frag'
-          destination-github-username: 'trynn-tech'
-          destination-repository-name: 'frag'
-          user-email: 'sync-bot@yuko.internal'
-          user-name: 'Yuko Sync Bot'
-          target-branch: 'master'
+      - name: Configure Git & Credentials
+        run: |
+          git config --global user.name "Yuko Sync Bot"
+          git config --global user.email "sync-bot@yuko.internal"
+          # Automatically injects your PAT for all GitHub HTTPS operations
+          git config --global url."https://x-access-token:${{ secrets.SUBREPO_SYNC_PAT }}@github.com/".insteadOf "https://github.com/"
 
-  sync-synth:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.SUBREPO_SYNC_PAT }}
+      - name: Install git-subrepo
+        run: |
+          git clone https://github.com/git-commands/git-subrepo /tmp/git-subrepo
+          echo "/tmp/git-subrepo/lib" >> $GITHUB_PATH
 
-      - name: Push Synth to GitHub
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.SUBREPO_SYNC_PAT }}
-        with:
-          source-directory: 'modules/synths'
-          destination-github-username: 'trynn-tech'
-          destination-repository-name: 'synth'
-          user-email: 'sync-bot@yuko.internal'
-          user-name: 'Yuko Sync Bot'
-          target-branch: 'master'
+      - name: Push Frag Subrepo
+        run: |
+          git subrepo push modules/editors/frag
+
+      - name: Push Synth Subrepo
+        run: |
+          git subrepo push modules/synths
