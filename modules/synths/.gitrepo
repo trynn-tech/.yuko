@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/ingydotnet/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/trynn-tech/synth.git
+	branch = master
+	commit = f5605ea7296e9f29417291a4a0bde162b4761154
+	parent = d84339ad0e2ebbe920a56abfe7a0506d2634d1d4
+	method = merge
+	cmdver = 0.4.9
